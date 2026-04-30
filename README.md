@@ -6,7 +6,7 @@ A personal, mobile-first Progressive Web App for tracking an Upper/Lower trainin
 
 ## 1. Overview
 
-This is a single-user workout logger built for one specific program (Upper/Lower, 5 training days over 7), with everything about the program — exercises, days, supersets, rest targets — editable from within the app rather than hardcoded. It is a PWA so that launching it from the iPhone home screen feels like a native app (fullscreen, no Safari chrome) and lets sets be logged offline, syncing to Supabase when the device reconnects. Desktop is a secondary, additive experience focused on analytics and plan editing.
+This is a single-user workout logger built for one specific program (Upper/Lower, 5 training days over 7), with everything about the program — exercises, days, rest targets — editable from within the app rather than hardcoded. It is a PWA so that launching it from the iPhone home screen feels like a native app (fullscreen, no Safari chrome) and lets sets be logged offline, syncing to Supabase when the device reconnects. Desktop is a secondary, additive experience focused on analytics and plan editing.
 
 ---
 
@@ -88,21 +88,7 @@ Same as Day 1.
 
 ### Day 7 — Rest
 
----
-
-## 5. Supersets
-
-Flagged pairings (both exercises performed back-to-back before resting):
-
-- Skullcrushers **+** Cable Pushdown
-- Bicep Curl **+** Brachialis Curl
-- Lateral Raise **+** Rear Delt Fly
-
-Superset pairings are stored in Supabase, editable in the plan editor, and drive the UI to stack paired exercises together during a session.
-
----
-
-## 6. Features
+## 5. Features
 
 ### 6.1 Active Session (mobile-primary)
 
@@ -146,7 +132,6 @@ Supported edits:
 - Reorder exercises within a day (drag and drop)
 - Create / rename / reorder workout days
 - Edit the weekly day-type schedule (which days are workout vs. rest)
-- Mark or unmark supersets
 - Change default sets per exercise
 
 **Plan versioning rules:**
@@ -218,7 +203,6 @@ All tables carry a `client_uuid` column, protected by an RLS policy: `USING (cli
 | `plan_versions` | `id`, `plan_id`, `client_uuid`, `version_number`, `created_at`, `is_active` |
 | `workout_days` | `id`, `plan_version_id`, `client_uuid`, `name`, `order_index`, `is_rest` |
 | `exercises` | `id`, `workout_day_id`, `client_uuid`, `name`, `muscle_group`, `type` (compound / isolation), `order_index`, `default_sets`, `previous_exercise_id` (for rename continuity) |
-| `superset_groups` | `id`, `workout_day_id`, `client_uuid`, `exercise_ids[]` |
 | `sessions` | `id`, `client_uuid`, `plan_version_id`, `workout_day_id`, `started_at`, `ended_at`, `foreground_ms`, `background_ms` |
 | `session_sets` | `id`, `session_id`, `exercise_id`, `client_uuid`, `set_order`, `weight`, `reps`, `rpe`, `is_warmup`, `is_skipped`, `note`, `logged_at` |
 | `goals` | `id`, `client_uuid`, `exercise_id`, `target_weight`, `target_reps`, `muscle_group` (for volume goals), `weekly_volume_target` |

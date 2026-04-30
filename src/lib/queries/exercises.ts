@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
-import type { Exercise, SupersetGroup } from '@/lib/supabase/database.types'
+import type { Exercise } from '@/lib/supabase/database.types'
 import { qk } from './keys'
 
 async function fetchExercises(workoutDayId: string): Promise<Exercise[]> {
@@ -22,15 +22,6 @@ async function fetchAllExercises(): Promise<Exercise[]> {
   return data ?? []
 }
 
-async function fetchSupersets(workoutDayId: string): Promise<SupersetGroup[]> {
-  const { data, error } = await supabase
-    .from('superset_groups')
-    .select('*')
-    .eq('workout_day_id', workoutDayId)
-  if (error) throw error
-  return data ?? []
-}
-
 export const useExercises = (workoutDayId: string | undefined) =>
   useQuery({
     queryKey: qk.exercises(workoutDayId ?? ''),
@@ -39,13 +30,6 @@ export const useExercises = (workoutDayId: string | undefined) =>
   })
 
 export const useAllExercises = () => useQuery({ queryKey: qk.exercisesAll(), queryFn: fetchAllExercises })
-
-export const useSupersets = (workoutDayId: string | undefined) =>
-  useQuery({
-    queryKey: qk.supersets(workoutDayId ?? ''),
-    queryFn: () => fetchSupersets(workoutDayId!),
-    enabled: !!workoutDayId,
-  })
 
 // Walks previous_exercise_id chain so renamed/reordered exercises share history.
 export function resolveExerciseLineage(targetId: string, all: Exercise[]): string[] {

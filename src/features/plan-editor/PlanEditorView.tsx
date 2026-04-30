@@ -4,10 +4,7 @@ import { Button } from '@/components/Button'
 import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
 import { useAllExercises } from '@/lib/queries/exercises'
 import { buildEditedPlanFromDb, snapshotPlan, type EditedDay, type EditedPlan } from './snapshotPlan'
-import { useQueries, useQueryClient } from '@tanstack/react-query'
-import { qk } from '@/lib/queries/keys'
-import { supabase } from '@/lib/supabase/client'
-import type { SupersetGroup } from '@/lib/supabase/database.types'
+import { useQueryClient } from '@tanstack/react-query'
 import { DayEditor } from './DayEditor'
 
 export function PlanEditorView() {
@@ -16,28 +13,14 @@ export function PlanEditorView() {
   const days = useWorkoutDays(pv.data?.id)
   const allExercises = useAllExercises()
 
-  const dayIds = days.data?.map((d) => d.id) ?? []
-  const supersetQueries = useQueries({
-    queries: dayIds.map((id) => ({
-      queryKey: qk.supersets(id),
-      queryFn: async (): Promise<SupersetGroup[]> => {
-        const { data, error } = await supabase.from('superset_groups').select('*').eq('workout_day_id', id)
-        if (error) throw error
-        return data ?? []
-      },
-    })),
-  })
-
-  const allLoaded =
-    !!pv.data && !!days.data && !!allExercises.data && supersetQueries.every((q) => q.isSuccess || q.isError)
+  const allLoaded = !!pv.data && !!days.data && !!allExercises.data
 
   const [draft, setDraft] = useState<EditedPlan | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
 
-  const { exercisesByDay, supersetsByDay } = useMemo(() => {
+  const exercisesByDay = useMemo(() => {
     const exMap = new Map<string, typeof allExercises.data extends infer T ? T extends readonly (infer U)[] ? U[] : never : never>()
-    const ssMap = new Map<string, SupersetGroup[]>()
     if (allExercises.data && days.data) {
       const dayIdSet = new Set(days.data.map((d) => d.id))
       for (const e of allExercises.data) {
@@ -46,14 +29,10 @@ export function PlanEditorView() {
         list.push(e)
         exMap.set(e.workout_day_id, list)
       }
-      days.data.forEach((d, i) => {
-        const r = supersetQueries[i]
-        if (r.data) ssMap.set(d.id, r.data)
-      })
     }
-    return { exercisesByDay: exMap, supersetsByDay: ssMap }
+    return exMap
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allExercises.data, days.data, ...supersetQueries.map((q) => q.data)])
+  }, [allExercises.data, days.data])
 
   useEffect(() => {
     if (allLoaded && pv.data && days.data && !draft) {
@@ -64,11 +43,10 @@ export function PlanEditorView() {
           pv.data.version_number,
           days.data,
           exercisesByDay as Map<string, never[]>,
-          supersetsByDay,
         ),
       )
     }
-  }, [allLoaded, pv.data, days.data, draft, exercisesByDay, supersetsByDay])
+  }, [allLoaded, pv.data, days.data, draft, exercisesByDay])
 
   if (pv.isLoading || days.isLoading || allExercises.isLoading || !draft) {
     return (

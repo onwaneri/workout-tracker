@@ -6,7 +6,7 @@ Guidance for Claude Code sessions working in this repo. Requirements live in [RE
 
 ## Project summary
 
-Single-user mobile-first PWA for logging an Upper/Lower workout split. React + TypeScript + Vite + Tailwind on the frontend; Supabase (Postgres + anonymous auth + RLS) as the backend; Vercel hosting. Installable to iPhone home screen, logs offline, rest-timer via web push notification. Plan (exercises, days, supersets) is fully editable from within the app — never hardcoded in the frontend.
+Single-user mobile-first PWA for logging an Upper/Lower workout split. React + TypeScript + Vite + Tailwind on the frontend; Supabase (Postgres + anonymous auth + RLS) as the backend; Vercel hosting. Installable to iPhone home screen, logs offline, rest-timer via web push notification. Plan (exercises, days) is fully editable from within the app — never hardcoded in the frontend.
 
 Treat `README.md` as the product source of truth. If something here conflicts with it, `README.md` wins — flag the conflict and ask.
 
@@ -69,13 +69,13 @@ Treat `README.md` as the product source of truth. If something here conflicts wi
 
 ### Do
 - Treat `README.md` as product spec; if unclear, ask the user rather than guess
-- Store everything plan-related (exercises, days, supersets, schedule, sets defaults) in Supabase — never in TypeScript constants
+- Store everything plan-related (exercises, days, schedule, sets defaults) in Supabase — never in TypeScript constants
 - Snapshot a new `plan_version` row on any plan edit
 - Log foreground/background time per session via the Page Visibility API
 - Test offline behavior in DevTools before shipping a release
 
 ### Don't
-- Don't hardcode exercises, days, supersets, or the weekly schedule in the frontend
+- Don't hardcode exercises, days, or the weekly schedule in the frontend
 - Don't mock Supabase in integration tests
 - Don't track bodyweight (explicitly excluded from the product)
 - Don't lock scheduling to calendar weekdays — the schedule is rolling, position-based

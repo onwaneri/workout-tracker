@@ -42,14 +42,6 @@ export type Exercise = {
   created_at: string
 }
 
-export type SupersetGroup = {
-  id: string
-  workout_day_id: string
-  client_uuid: string
-  exercise_ids: string[]
-  created_at: string
-}
-
 export type Session = {
   id: string
   client_uuid: string
@@ -124,13 +116,6 @@ type ExerciseInsert = {
   id?: string
   created_at?: string
 }
-type SupersetGroupInsert = {
-  workout_day_id: string
-  client_uuid: string
-  exercise_ids: string[]
-  id?: string
-  created_at?: string
-}
 type SessionInsert = {
   client_uuid: string
   plan_version_id: string
@@ -174,7 +159,6 @@ export type Database = {
       plan_versions: Table<PlanVersion, PlanVersionInsert>
       workout_days: Table<WorkoutDay, WorkoutDayInsert>
       exercises: Table<Exercise, ExerciseInsert>
-      superset_groups: Table<SupersetGroup, SupersetGroupInsert>
       sessions: Table<Session, SessionInsert>
       session_sets: Table<SessionSet, SessionSetInsert>
       goals: Table<Goal, GoalInsert>

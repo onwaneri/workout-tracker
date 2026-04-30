@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { getClientUuid } from '@/lib/supabase/uuid'
-import type { Exercise, ExerciseType, SupersetGroup, WorkoutDay } from '@/lib/supabase/database.types'
+import type { Exercise, ExerciseType, WorkoutDay } from '@/lib/supabase/database.types'
 
 export type EditedExercise = {
   id?: string
@@ -16,7 +16,6 @@ export type EditedDay = {
   name: string
   is_rest: boolean
   exercises: EditedExercise[]
-  supersets: number[][] // indexes into `exercises`
 }
 
 export type EditedPlan = {
@@ -51,7 +50,7 @@ export async function snapshotPlan(edited: EditedPlan): Promise<string> {
   if (pvErr || !pv) throw pvErr ?? new Error('plan_version create failed')
   const newPvId = pv.id
 
-  // 3) create days, exercises, supersets
+  // 3) create days and exercises
   for (let i = 0; i < edited.days.length; i++) {
     const d = edited.days[i]
     const { data: day, error: dErr } = await supabase
@@ -81,21 +80,6 @@ export async function snapshotPlan(edited: EditedPlan): Promise<string> {
     }))
     const { data: exs, error: exErr } = await supabase.from('exercises').insert(exRows).select('id')
     if (exErr || !exs) throw exErr ?? new Error('exercises create failed')
-
-    if (d.supersets.length > 0) {
-      const supRows = d.supersets
-        .map((idxs) => idxs.map((i2) => exs[i2]?.id).filter(Boolean) as string[])
-        .filter((arr) => arr.length >= 2)
-        .map((exercise_ids) => ({
-          workout_day_id: day.id,
-          client_uuid: clientUuid,
-          exercise_ids,
-        }))
-      if (supRows.length > 0) {
-        const { error: ssErr } = await supabase.from('superset_groups').insert(supRows)
-        if (ssErr) throw ssErr
-      }
-    }
   }
 
   return newPvId
@@ -108,7 +92,6 @@ export function buildEditedPlanFromDb(
   versionNumber: number,
   days: WorkoutDay[],
   exercisesByDay: Map<string, Exercise[]>,
-  supersetsByDay: Map<string, SupersetGroup[]>,
 ): EditedPlan {
   return {
     planId,
@@ -118,7 +101,6 @@ export function buildEditedPlanFromDb(
       .sort((a, b) => a.order_index - b.order_index)
       .map((d) => {
         const exs = (exercisesByDay.get(d.id) ?? []).slice().sort((a, b) => a.order_index - b.order_index)
-        const idToIdx = new Map(exs.map((e, i) => [e.id, i] as const))
         return {
           id: d.id,
           name: d.name,
@@ -131,9 +113,6 @@ export function buildEditedPlanFromDb(
             type: e.type,
             default_sets: e.default_sets,
           })),
-          supersets: (supersetsByDay.get(d.id) ?? []).map((g) =>
-            g.exercise_ids.map((id) => idToIdx.get(id)).filter((i): i is number => i !== undefined),
-          ),
         }
       }),
   }

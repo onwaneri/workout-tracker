@@ -6,7 +6,7 @@ const STORE = 'pending-mutations'
 
 type PendingMutation = {
   id: string
-  table: 'sessions' | 'session_sets' | 'goals' | 'plan_versions' | 'workout_days' | 'exercises' | 'superset_groups' | 'plans'
+  table: 'sessions' | 'session_sets' | 'goals' | 'plan_versions' | 'workout_days' | 'exercises' | 'plans'
   op: 'insert' | 'update' | 'delete'
   payload: Record<string, unknown>
   filter?: Record<string, unknown>

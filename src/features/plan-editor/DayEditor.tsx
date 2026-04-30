@@ -33,9 +33,6 @@ export function DayEditor({
   const removeExercise = (idx: number) => {
     update({
       exercises: day.exercises.filter((_, i) => i !== idx),
-      supersets: day.supersets
-        .map((g) => g.filter((i) => i !== idx).map((i) => (i > idx ? i - 1 : i)))
-        .filter((g) => g.length >= 2),
     })
   }
 
@@ -44,23 +41,7 @@ export function DayEditor({
     const exs = day.exercises.slice()
     const [m] = exs.splice(from, 1)
     exs.splice(to, 0, m)
-    const remap = (i: number) => {
-      if (i === from) return to
-      if (from < to && i > from && i <= to) return i - 1
-      if (from > to && i < from && i >= to) return i + 1
-      return i
-    }
-    const sup = day.supersets.map((g) => g.map(remap))
-    update({ exercises: exs, supersets: sup })
-  }
-
-  const toggleSuperset = (a: number, b: number) => {
-    const has = day.supersets.find((g) => g.includes(a) && g.includes(b))
-    if (has) {
-      update({ supersets: day.supersets.filter((g) => g !== has) })
-    } else {
-      update({ supersets: [...day.supersets, [a, b]] })
-    }
+    update({ exercises: exs })
   }
 
   return (
@@ -149,33 +130,6 @@ export function DayEditor({
           <div className="mt-3 flex items-center justify-between gap-2">
             <Button variant="secondary" onClick={addExercise}>+ Add exercise</Button>
           </div>
-
-          {day.exercises.length >= 2 && (
-            <div className="mt-3 border-t border-[color:var(--color-border)] pt-3">
-              <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)] mb-2">Supersets</div>
-              <div className="flex flex-wrap gap-2">
-                {day.exercises.flatMap((_, i) =>
-                  day.exercises.map((__, j) => {
-                    if (j <= i) return null
-                    const linked = day.supersets.some((g) => g.includes(i) && g.includes(j))
-                    return (
-                      <button
-                        key={`${i}-${j}`}
-                        onClick={() => toggleSuperset(i, j)}
-                        className={`text-xs px-2 py-1 rounded-md border min-h-[36px] ${
-                          linked
-                            ? 'border-[color:var(--color-accent)] bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]'
-                            : 'border-[color:var(--color-border)] text-[color:var(--color-muted)]'
-                        }`}
-                      >
-                        {day.exercises[i].name} + {day.exercises[j].name}
-                      </button>
-                    )
-                  }),
-                )}
-              </div>
-            </div>
-          )}
         </>
       )}
     </div>

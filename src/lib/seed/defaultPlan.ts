@@ -7,7 +7,6 @@ type DayDef =
       name: string
       isRest?: false
       exercises: Array<{ name: string; muscleGroup: string; type: 'compound' | 'isolation'; defaultSets?: number }>
-      supersets?: Array<[string, string]>
     }
 
 const UPPER: DayDef = {
@@ -22,11 +21,6 @@ const UPPER: DayDef = {
     { name: 'Brachialis Curl', muscleGroup: 'Brachialis', type: 'isolation' },
     { name: 'Lateral Raise', muscleGroup: 'Lateral Delt', type: 'isolation' },
     { name: 'Rear Delt Fly', muscleGroup: 'Rear Delt', type: 'isolation' },
-  ],
-  supersets: [
-    ['Skullcrushers', 'Cable Pushdown'],
-    ['Bicep Curl', 'Brachialis Curl'],
-    ['Lateral Raise', 'Rear Delt Fly'],
   ],
 }
 
@@ -119,21 +113,6 @@ export async function ensureDefaultPlan(): Promise<{ planId: string; planVersion
     }))
     const { data: exs, error: exErr } = await supabase.from('exercises').insert(exerciseRows).select('id, name')
     if (exErr || !exs) throw exErr ?? new Error('exercises insert failed')
-    const idByName = new Map(exs.map((x) => [x.name as string, x.id as string]))
-
-    if (def.supersets?.length) {
-      const groups = def.supersets
-        .map(([a, b]) => {
-          const aId = idByName.get(a)
-          const bId = idByName.get(b)
-          return aId && bId ? { workout_day_id: day.id, client_uuid: clientUuid, exercise_ids: [aId, bId] } : null
-        })
-        .filter((x): x is NonNullable<typeof x> => x !== null)
-      if (groups.length) {
-        const { error: ssErr } = await supabase.from('superset_groups').insert(groups)
-        if (ssErr) throw ssErr
-      }
-    }
   }
 
   return { planId: plan.id, planVersionId: pv.id }

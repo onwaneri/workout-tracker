@@ -8,7 +8,6 @@ export const qk = {
   workoutDays: (planVersionId: string) => ['workout-days', c(), planVersionId] as const,
   exercises: (workoutDayId: string) => ['exercises', c(), workoutDayId] as const,
   exercisesAll: () => ['exercises', 'all', c()] as const,
-  supersets: (workoutDayId: string) => ['supersets', c(), workoutDayId] as const,
   sessions: () => ['sessions', c()] as const,
   session: (id: string) => ['session', c(), id] as const,
   sessionSets: (sessionId: string) => ['session-sets', c(), sessionId] as const,

@@ -23,11 +23,9 @@ export function GoalsEditor() {
     if (!allEx.data) return []
     const seen = new Map<string, { id: string; name: string }>()
     for (const e of allEx.data) {
-      const lineage = resolveExerciseLineage(e.id, allEx.data)
-      const root = lineage[lineage.length - 1] ?? e.id
-      const cur = seen.get(root)
-      if (!cur || (allEx.data.find((x) => x.id === cur.id)?.created_at ?? '') < e.created_at) {
-        seen.set(root, { id: e.id, name: e.name })
+      const current = seen.get(e.name)
+      if (!current || (allEx.data.find((x) => x.id === current.id)?.created_at ?? '') < e.created_at) {
+        seen.set(e.name, { id: e.id, name: e.name })
       }
     }
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))

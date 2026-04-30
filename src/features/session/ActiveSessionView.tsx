@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useSession } from './sessionStore'
-import { useExercises, useSupersets } from '@/lib/queries/exercises'
+import { useExercises } from '@/lib/queries/exercises'
 import { useSessionSets, useEndSession, useLogSet } from '@/lib/queries/sessions'
 import { SetRow } from './SetRow'
 import { useVisibilityTracking } from './useVisibilityTracking'
@@ -20,16 +20,15 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
   useRestNotification(sessionId)
 
   const exercises = useExercises(workoutDayId ?? undefined)
-  const supersets = useSupersets(workoutDayId ?? undefined)
   const sets = useSessionSets(sessionId ?? undefined)
 
   const endSession = useEndSession()
   const logSet = useLogSet()
 
-  const groups = useMemo(() => groupBySupersets(exercises.data ?? [], supersets.data ?? []), [
-    exercises.data,
-    supersets.data,
-  ])
+  const groups = useMemo(() => {
+    const sorted = [...(exercises.data ?? [])].sort((a, b) => a.order_index - b.order_index)
+    return sorted.map((e) => [e])
+  }, [exercises.data])
 
   const skippedIds = useMemo(() => {
     const s = new Set<string>()
@@ -109,11 +108,6 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
       <ul className="space-y-4 pb-12">
         {groups.map((g, i) => (
           <li key={i} className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-            {g.length > 1 && (
-              <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-accent)] mb-2">
-                Superset
-              </div>
-            )}
             {g.map((e) => {
               const skipped = skippedIds.has(e.id)
               const count = setsByExercise.get(e.id) ?? 0
@@ -148,29 +142,4 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
       </ul>
     </Screen>
   )
-}
-
-function groupBySupersets(exercises: Exercise[], supersets: { exercise_ids: string[] }[]): Exercise[][] {
-  const sorted = [...exercises].sort((a, b) => a.order_index - b.order_index)
-  const inSuper = new Map<string, number>()
-  supersets.forEach((g, idx) => g.exercise_ids.forEach((id) => inSuper.set(id, idx)))
-
-  const result: Exercise[][] = []
-  const seenSuperset = new Set<number>()
-
-  for (const e of sorted) {
-    const sIdx = inSuper.get(e.id)
-    if (sIdx === undefined) {
-      result.push([e])
-      continue
-    }
-    if (seenSuperset.has(sIdx)) continue
-    seenSuperset.add(sIdx)
-    const ids = supersets[sIdx].exercise_ids
-    const grouped = ids
-      .map((id) => sorted.find((x) => x.id === id))
-      .filter((x): x is Exercise => x !== undefined)
-    result.push(grouped)
-  }
-  return result
 }
