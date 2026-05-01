@@ -83,19 +83,46 @@ export const useStartSession = () => {
 export const useEndSession = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { id: string; foreground_ms: number; background_ms: number }) => {
-      const { data, error } = await supabase
-        .from('sessions')
-        .update({
-          ended_at: new Date().toISOString(),
-          foreground_ms: input.foreground_ms,
-          background_ms: input.background_ms,
-        })
-        .eq('id', input.id)
-        .select('*')
-        .single()
-      if (error) throw error
-      return data as Session
+    mutationFn: async (input: {
+      id: string
+      foreground_ms: number
+      background_ms: number
+    }): Promise<Session> => {
+      const payload = {
+        ended_at: new Date().toISOString(),
+        foreground_ms: input.foreground_ms,
+        background_ms: input.background_ms,
+      }
+      const filter = { id: input.id }
+      try {
+        const { data, error } = await supabase
+          .from('sessions')
+          .update(payload)
+          .eq('id', input.id)
+          .select('*')
+          .single()
+        if (error) throw error
+        return data as Session
+      } catch (err) {
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
+          const cached =
+            qc.getQueryData<Session>(qk.session(input.id)) ??
+            qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
+          if (cached) return { ...cached, ...payload }
+          return {
+            id: input.id,
+            client_uuid: getClientUuid(),
+            plan_version_id: '',
+            workout_day_id: '',
+            started_at: payload.ended_at,
+            ended_at: payload.ended_at,
+            foreground_ms: payload.foreground_ms,
+            background_ms: payload.background_ms,
+          }
+        }
+        throw err
+      }
     },
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: qk.sessions() })
@@ -108,7 +135,11 @@ export const useLogSet = () => {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: async (
-      input: Omit<SessionSet, 'id' | 'client_uuid' | 'logged_at'> & { logged_at?: string },
+      input: Omit<SessionSet, 'id' | 'client_uuid' | 'logged_at' | 'rest_ms' | 'rest_target_seconds'> & {
+        logged_at?: string
+        rest_ms?: number | null
+        rest_target_seconds?: number | null
+      },
     ): Promise<SessionSet> => {
       const payload = { ...input, client_uuid: getClientUuid() }
       try {
@@ -132,6 +163,8 @@ export const useLogSet = () => {
             is_skipped: input.is_skipped,
             note: input.note ?? null,
             logged_at: input.logged_at ?? new Date().toISOString(),
+            rest_ms: input.rest_ms ?? null,
+            rest_target_seconds: input.rest_target_seconds ?? null,
           }
         }
         throw err
@@ -140,6 +173,29 @@ export const useLogSet = () => {
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: qk.sessionSets(s.session_id) })
       qc.invalidateQueries({ queryKey: qk.exerciseHistory(s.exercise_id) })
+    },
+  })
+}
+
+export const useUpdateSetRest = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { setId: string; sessionId: string; restMs: number }) => {
+      const filter = { id: input.setId }
+      const payload = { rest_ms: input.restMs }
+      try {
+        const { error } = await supabase.from('session_sets').update(payload).eq('id', input.setId)
+        if (error) throw error
+      } catch (err) {
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'session_sets', op: 'update', payload, filter })
+          return
+        }
+        throw err
+      }
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: qk.sessionSets(vars.sessionId) })
     },
   })
 }

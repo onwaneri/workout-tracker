@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
@@ -11,7 +11,8 @@ import { restTargetSeconds } from '@/features/session/restTargets'
 import { fmtDuration } from '@/lib/format'
 import { SessionSummary } from '@/features/session-stats/SessionSummary'
 import { useEnsurePlan } from '@/lib/seed/useEnsurePlan'
-import { useState } from 'react'
+import { CycleStrip } from './CycleStrip'
+import { PickAnotherView } from './PickAnotherView'
 
 export function TodayView() {
   const seed = useEnsurePlan()
@@ -21,14 +22,28 @@ export function TodayView() {
   const session = useSession()
   const startSession = useStartSession()
 
+  const workoutDays = useMemo(
+    () => (days.data ? [...days.data].filter((d) => !d.is_rest).sort((a, b) => a.order_index - b.order_index) : []),
+    [days.data],
+  )
+
   const nextDay = useMemo(
     () => (days.data && sessions.data ? pickNextWorkoutDay(days.data, sessions.data) : null),
     [days.data, sessions.data],
   )
 
-  const exercisesQuery = useExercises(nextDay?.id)
+  const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
+
+  const activeDay = useMemo(() => {
+    if (selectedDayId) return workoutDays.find((d) => d.id === selectedDayId) ?? nextDay
+    return nextDay
+  }, [selectedDayId, workoutDays, nextDay])
+
+  const exercisesQuery = useExercises(activeDay?.id)
 
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
+  const [pickerBusyDayId, setPickerBusyDayId] = useState<string | null>(null)
 
   if (seed.status === 'seeding' || seed.status === 'idle') {
     return (
@@ -61,10 +76,45 @@ export function TodayView() {
   }
 
   if (completedSessionId) {
-    return <SessionSummary sessionId={completedSessionId} onClose={() => setCompletedSessionId(null)} />
+    return (
+      <SessionSummary
+        sessionId={completedSessionId}
+        onClose={() => {
+          setCompletedSessionId(null)
+          setShowPicker(true)
+        }}
+      />
+    )
   }
 
-  if (!nextDay || !pv.data) {
+  if (showPicker) {
+    return (
+      <PickAnotherView
+        busyDayId={pickerBusyDayId}
+        onExit={() => {
+          setShowPicker(false)
+          setPickerBusyDayId(null)
+        }}
+        onPick={async (day) => {
+          if (!pv.data) return
+          setPickerBusyDayId(day.id)
+          try {
+            const result = await startSession.mutateAsync({
+              plan_version_id: pv.data.id,
+              workout_day_id: day.id,
+            })
+            session.setActive({ sessionId: result.id, workoutDayId: day.id, startedAt: Date.now() })
+            setShowPicker(false)
+            setPickerBusyDayId(null)
+          } catch {
+            setPickerBusyDayId(null)
+          }
+        }}
+      />
+    )
+  }
+
+  if (!nextDay || !activeDay || !pv.data) {
     return (
       <Screen title="Today">
         <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
@@ -74,21 +124,41 @@ export function TodayView() {
 
   const exs = exercisesQuery.data ?? []
   const estimatedMs = exs.reduce((acc, e) => acc + e.default_sets * restTargetSeconds(e.type) * 1000, 0)
+  const isOffNext = activeDay.id !== nextDay.id
 
   const onStart = async () => {
-    if (!pv.data || !nextDay) return
+    if (!pv.data || !activeDay) return
     const result = await startSession.mutateAsync({
       plan_version_id: pv.data.id,
-      workout_day_id: nextDay.id,
+      workout_day_id: activeDay.id,
     })
-    session.setActive({ sessionId: result.id, workoutDayId: nextDay.id, startedAt: Date.now() })
+    session.setActive({ sessionId: result.id, workoutDayId: activeDay.id, startedAt: Date.now() })
   }
 
   return (
     <Screen title="Today">
+      <div className="mb-4">
+        <CycleStrip
+          workoutDays={workoutDays}
+          nextDayId={nextDay.id}
+          selectedDayId={selectedDayId}
+          onSelect={(offset, day) => setSelectedDayId(offset === 0 ? null : day.id)}
+        />
+        {isOffNext && (
+          <button
+            onClick={() => setSelectedDayId(null)}
+            className="mt-2 text-xs text-[color:var(--color-muted)] underline"
+          >
+            Back to next
+          </button>
+        )}
+      </div>
+
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
-        <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Next session</div>
-        <div className="mt-1 text-xl font-semibold">{nextDay.name}</div>
+        <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">
+          {isOffNext ? 'Picked workout' : 'Next session'}
+        </div>
+        <div className="mt-1 text-xl font-semibold">{activeDay.name}</div>
         <div className="mt-1 text-xs text-[color:var(--color-muted)]">
           ~{fmtDuration(estimatedMs)} · {exs.length} exercises
         </div>

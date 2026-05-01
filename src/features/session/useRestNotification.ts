@@ -41,6 +41,11 @@ export function scheduleRestNotification(restSeconds: number, body: string): voi
   })
 }
 
+export function cancelRestNotification(): void {
+  if (typeof navigator === 'undefined' || !navigator.serviceWorker?.controller) return
+  navigator.serviceWorker.controller.postMessage({ type: 'CANCEL_REST' })
+}
+
 export function useRestNotification(activeSessionId: string | null) {
   const [permission, setPermission] = useState<NotifPermission>(getPermission())
 

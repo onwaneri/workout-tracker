@@ -66,6 +66,8 @@ export type SessionSet = {
   is_skipped: boolean
   note: string | null
   logged_at: string
+  rest_ms: number | null
+  rest_target_seconds: number | null
 }
 
 export type Goal = {
@@ -138,6 +140,8 @@ type SessionSetInsert = {
   is_skipped?: boolean
   note?: string | null
   logged_at?: string
+  rest_ms?: number | null
+  rest_target_seconds?: number | null
   id?: string
 }
 type GoalInsert = {

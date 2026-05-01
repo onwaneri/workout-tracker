@@ -9,7 +9,8 @@ import { startOfISOWeek } from '@/lib/format'
 import { supabase } from '@/lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
 import { volumeByMuscleGroup } from '@/lib/stats/volume'
-import { fmtVolume } from '@/lib/format'
+import { avgRestMs } from '@/lib/stats/rest'
+import { fmtDuration, fmtVolume } from '@/lib/format'
 import { GoalsEditor } from '@/features/goals/GoalsEditor'
 
 export function StatsView() {
@@ -47,6 +48,7 @@ export function StatsView() {
   const completedThisWeek = sessionsInWeek(sessions.data, weekStart).filter((s) => s.ended_at).length
   const streak = consistencyStreakWeeks(sessions.data, plannedPerWeek)
   const weekVolume = weekSets.data ? volumeByMuscleGroup(weekSets.data, allEx.data) : new Map<string, number>()
+  const weekAvgRest = weekSets.data ? avgRestMs(weekSets.data) : 0
   const volumeGoals = (goals.data ?? []).filter((g) => g.muscle_group && g.weekly_volume_target)
 
   return (
@@ -54,6 +56,7 @@ export function StatsView() {
       <div className="grid grid-cols-2 gap-3">
         <Stat label="This week" value={`${completedThisWeek}/${plannedPerWeek}`} />
         <Stat label="Streak" value={`${streak}w`} />
+        <Stat label="Avg rest" value={weekAvgRest > 0 ? fmtDuration(weekAvgRest) : '—'} />
       </div>
 
       <Section title="Weekly volume">

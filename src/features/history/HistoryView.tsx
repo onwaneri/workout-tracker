@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
-import { fmtDate, fmtWeight } from '@/lib/format'
+import { fmtDate, fmtDuration, fmtWeight } from '@/lib/format'
+import { avgRestMs, totalRestMs } from '@/lib/stats/rest'
 import { ExerciseChart } from './ExerciseChart'
 
 type HistoryGroup = { id: string; name: string; ids: string[] }
@@ -89,26 +90,35 @@ export function HistoryView() {
           <ExerciseChart sets={hist.data ?? []} />
         </div>
         {hist.data && hist.data.length > 0 ? (
-          <table className="w-full text-sm">
-            <thead className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">
-              <tr>
-                <th className="text-left py-2">Date</th>
-                <th className="text-right">Weight</th>
-                <th className="text-right">Reps</th>
-                <th className="text-right">RPE</th>
-              </tr>
-            </thead>
-            <tbody>
-              {hist.data.map((s) => (
-                <tr key={s.id} className="border-t border-[color:var(--color-border)]">
-                  <td className="py-2">{fmtDate(s.logged_at)}</td>
-                  <td className="text-right">{fmtWeight(s.weight)}</td>
-                  <td className="text-right">{s.reps ?? '—'}</td>
-                  <td className="text-right text-[color:var(--color-muted)]">{s.rpe ?? '—'}</td>
+          <>
+            <div className="text-xs text-[color:var(--color-muted)] mb-2">
+              Avg rest {fmtDuration(avgRestMs(hist.data))} · Total rest logged {fmtDuration(totalRestMs(hist.data))}
+            </div>
+            <table className="w-full text-sm">
+              <thead className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">
+                <tr>
+                  <th className="text-left py-2">Date</th>
+                  <th className="text-right">Weight</th>
+                  <th className="text-right">Reps</th>
+                  <th className="text-right">RPE</th>
+                  <th className="text-right">Rest</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {hist.data.map((s) => (
+                  <tr key={s.id} className="border-t border-[color:var(--color-border)]">
+                    <td className="py-2">{fmtDate(s.logged_at)}</td>
+                    <td className="text-right">{fmtWeight(s.weight)}</td>
+                    <td className="text-right">{s.reps ?? '—'}</td>
+                    <td className="text-right text-[color:var(--color-muted)]">{s.rpe ?? '—'}</td>
+                    <td className="text-right text-[color:var(--color-muted)]">
+                      {s.rest_ms != null ? fmtDuration(s.rest_ms) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
         ) : (
           <p className="text-sm text-[color:var(--color-muted)]">No sets logged yet.</p>
         )}

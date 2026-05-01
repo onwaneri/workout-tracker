@@ -1,13 +1,14 @@
-import { useMemo } from 'react'
+import { useCallback, useMemo } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useSession } from './sessionStore'
 import { useExercises } from '@/lib/queries/exercises'
-import { useSessionSets, useEndSession, useLogSet } from '@/lib/queries/sessions'
+import { useSessionSets, useEndSession, useLogSet, useUpdateSetRest } from '@/lib/queries/sessions'
 import { SetRow } from './SetRow'
 import { useVisibilityTracking } from './useVisibilityTracking'
-import { useRestNotification, scheduleRestNotification } from './useRestNotification'
+import { useRestNotification, scheduleRestNotification, cancelRestNotification } from './useRestNotification'
 import { restTargetSeconds } from './restTargets'
+import { RestTimerBanner } from './RestTimerBanner'
 import { fmtDuration } from '@/lib/format'
 import type { Exercise } from '@/lib/supabase/database.types'
 
@@ -15,6 +16,7 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
   const session = useSession()
   const sessionId = session.activeSessionId
   const workoutDayId = session.workoutDayId
+  const restTimer = session.restTimer
 
   useVisibilityTracking(sessionId !== null)
   useRestNotification(sessionId)
@@ -24,6 +26,7 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
 
   const endSession = useEndSession()
   const logSet = useLogSet()
+  const updateRest = useUpdateSetRest()
 
   const groups = useMemo(() => {
     const sorted = [...(exercises.data ?? [])].sort((a, b) => a.order_index - b.order_index)
@@ -45,13 +48,27 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
     return m
   }, [sets.data])
 
+  const finalizeRest = useCallback(() => {
+    const t = useSession.getState().restTimer
+    if (!t || !sessionId) return
+    const restMs = Math.max(0, Date.now() - t.startedAt)
+    updateRest.mutate({ setId: t.setId, sessionId, restMs })
+    cancelRestNotification()
+    session.clearRest()
+  }, [sessionId, updateRest, session])
+
   if (!sessionId || !workoutDayId) {
     return null
   }
 
-  const onLogSet = (e: Exercise, payload: { weight: number | null; reps: number | null; rpe: number | null; isWarmup: boolean; note: string | null }) => {
+  const onLogSet = async (
+    e: Exercise,
+    payload: { weight: number | null; reps: number | null; rpe: number | null; isWarmup: boolean; note: string | null },
+  ) => {
+    finalizeRest()
     const setOrder = (setsByExercise.get(e.id) ?? 0) + 1
-    logSet.mutate({
+    const target = payload.isWarmup ? null : restTargetSeconds(e.type)
+    const inserted = await logSet.mutateAsync({
       session_id: sessionId,
       exercise_id: e.id,
       set_order: setOrder,
@@ -61,9 +78,18 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
       is_warmup: payload.isWarmup,
       is_skipped: false,
       note: payload.note,
+      rest_target_seconds: target,
     })
-    if (!payload.isWarmup) {
-      scheduleRestNotification(restTargetSeconds(e.type), `Rest done — ${e.name}`)
+    if (!payload.isWarmup && target != null) {
+      scheduleRestNotification(target, `Rest done — ${e.name}`)
+      session.startRest({
+        setId: inserted.id,
+        exerciseId: e.id,
+        exerciseName: e.name,
+        targetSeconds: target,
+        // eslint-disable-next-line react-hooks/purity
+        startedAt: Date.now(),
+      })
     }
   }
 
@@ -78,10 +104,12 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
       is_warmup: false,
       is_skipped: true,
       note: null,
+      rest_target_seconds: null,
     })
   }
 
   const onComplete2 = async () => {
+    finalizeRest()
     await endSession.mutateAsync({
       id: sessionId,
       foreground_ms: session.foregroundMs,
@@ -105,7 +133,7 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
         Elapsed {fmtDuration(elapsed)} · Off-app {fmtDuration(session.backgroundMs)}
       </div>
 
-      <ul className="space-y-4 pb-12">
+      <ul className="space-y-4 pb-32">
         {groups.map((g, i) => (
           <li key={i} className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
             {g.map((e) => {
@@ -140,6 +168,8 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
           </li>
         ))}
       </ul>
+
+      {restTimer && <RestTimerBanner timer={restTimer} onSkip={finalizeRest} />}
     </Screen>
   )
 }

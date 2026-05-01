@@ -6,8 +6,10 @@ import { useExercises } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { totalVolume, volumeByMuscleGroup } from '@/lib/stats/volume'
+import { totalRestMs } from '@/lib/stats/rest'
 import { detectPRs } from '@/lib/stats/prs'
 import { fmtDuration, fmtVolume, fmtWeight } from '@/lib/format'
+import { Confetti } from './Confetti'
 
 export function SessionSummary({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const sess = useSession(sessionId)
@@ -53,18 +55,30 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
 
   return (
     <Screen
-      title="Summary"
+      title="Complete"
       action={
         <Button variant="primary" onClick={onClose}>
-          Done
+          Back
         </Button>
       }
     >
+      <Confetti />
+      <div className="text-center py-4">
+        <div className="text-4xl mb-2" aria-hidden>
+          🎉
+        </div>
+        <h1 className="text-2xl font-bold tracking-tight">Congratulations!</h1>
+        <p className="text-sm text-[color:var(--color-muted)] mt-1">
+          You crushed {completedSets} {completedSets === 1 ? 'set' : 'sets'} in {fmtDuration(duration)}.
+        </p>
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <Stat label="Duration" value={fmtDuration(duration)} />
         <Stat label="Off-app" value={fmtDuration(offApp)} />
         <Stat label="Volume" value={fmtVolume(total)} sub="lb" />
         <Stat label="Sets" value={`${completedSets}/${plannedSets}`} />
+        <Stat label="Total rest" value={fmtDuration(totalRestMs(setsThisSession))} />
       </div>
 
       <Section title="Volume by muscle group">

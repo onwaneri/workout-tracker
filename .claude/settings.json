@@ -10,7 +10,14 @@
       "Bash(curl -sS http://localhost:5173/)",
       "Bash(curl -sS http://localhost:5174/)",
       "Bash(curl -sS http://localhost:5174/manifest.webmanifest)",
-      "Bash(kill 93771)"
+      "Bash(kill 93771)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(tee /tmp/tsc-out.txt)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(npm run *)",
+      "Bash(git stash *)"
     ]
   }
 }
