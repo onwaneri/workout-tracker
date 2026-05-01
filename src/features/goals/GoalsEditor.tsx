@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Button } from '@/components/Button'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
-import { useGoals, useUpsertExerciseGoal, useUpsertVolumeGoal } from '@/lib/queries/goals'
+import { useGoals, useUpsertExerciseGoal } from '@/lib/queries/goals'
 import { fmtWeight } from '@/lib/format'
 
 const SMALLEST_PLATE_LB = 2.5
@@ -11,13 +11,6 @@ export function GoalsEditor() {
   const allEx = useAllExercises()
   const goals = useGoals()
   const upsertExGoal = useUpsertExerciseGoal()
-  const upsertVolGoal = useUpsertVolumeGoal()
-
-  const muscleGroups = useMemo(() => {
-    const set = new Set<string>()
-    for (const e of allEx.data ?? []) set.add(e.muscle_group)
-    return Array.from(set).sort()
-  }, [allEx.data])
 
   const exerciseHeads = useMemo(() => {
     if (!allEx.data) return []
@@ -47,23 +40,6 @@ export function GoalsEditor() {
               }
             />
           ))}
-        </ul>
-      </div>
-
-      <div>
-        <h3 className="text-xs uppercase tracking-wide text-[color:var(--color-muted)] mb-2">Weekly volume</h3>
-        <ul className="space-y-2">
-          {muscleGroups.map((m) => {
-            const goal = (goals.data ?? []).find((g) => g.muscle_group === m && !g.exercise_id)
-            return (
-              <VolumeGoalRow
-                key={m}
-                muscleGroup={m}
-                target={goal?.weekly_volume_target ?? null}
-                onSave={(weekly_volume_target) => upsertVolGoal.mutate({ muscle_group: m, weekly_volume_target })}
-              />
-            )
-          })}
         </ul>
       </div>
     </div>
@@ -154,29 +130,3 @@ function ExerciseGoalRow({
   )
 }
 
-function VolumeGoalRow({
-  muscleGroup,
-  target,
-  onSave,
-}: {
-  muscleGroup: string
-  target: number | null
-  onSave: (v: number) => void
-}) {
-  const [v, setV] = useState<string>(target?.toString() ?? '')
-  return (
-    <li className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] p-2">
-      <div className="flex-1 text-sm">{muscleGroup}</div>
-      <input
-        inputMode="numeric"
-        placeholder="Weekly lb"
-        value={v}
-        onChange={(e) => setV(e.target.value)}
-        className="w-24 bg-transparent text-sm focus:outline-none border-b border-[color:var(--color-border)] py-1"
-      />
-      <Button variant="secondary" onClick={() => v !== '' && onSave(Number(v))}>
-        Save
-      </Button>
-    </li>
-  )
-}

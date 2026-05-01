@@ -5,45 +5,82 @@ import { useExerciseHistory } from '@/lib/queries/sessions'
 import { fmtDate, fmtWeight } from '@/lib/format'
 import { ExerciseChart } from './ExerciseChart'
 
+type HistoryGroup = { id: string; name: string; ids: string[] }
+
 export function HistoryView() {
   const allEx = useAllExercises()
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [selectedGroup, setSelectedGroup] = useState<HistoryGroup | null>(null)
 
   const latestByLogicalName = useMemo(() => {
     if (!allEx.data) return []
-    // Show one row per "logical exercise" — most recent in each lineage chain.
-    const byLineageHead = new Map<string, { id: string; name: string; lineage: string[] }>()
+
+    const groupsByRoot = new Map<
+      string,
+      { id: string; name: string; ids: Set<string>; latestCreatedAt: string }
+    >()
+
     for (const e of allEx.data) {
       const lineage = resolveExerciseLineage(e.id, allEx.data)
       const root = lineage[lineage.length - 1] ?? e.id
-      const existing = byLineageHead.get(root)
+      const existing = groupsByRoot.get(root)
       if (!existing) {
-        byLineageHead.set(root, { id: e.id, name: e.name, lineage })
+        groupsByRoot.set(root, {
+          id: e.id,
+          name: e.name,
+          ids: new Set(lineage),
+          latestCreatedAt: e.created_at,
+        })
       } else {
-        // Keep whichever is newer (later created_at, found via id lookup)
-        const a = allEx.data.find((x) => x.id === existing.id)
-        const b = e
-        if (a && b && b.created_at > a.created_at) {
-          byLineageHead.set(root, { id: e.id, name: e.name, lineage })
+        for (const id of lineage) existing.ids.add(id)
+        if (e.created_at > existing.latestCreatedAt) {
+          existing.id = e.id
+          existing.name = e.name
+          existing.latestCreatedAt = e.created_at
         }
       }
     }
-    return Array.from(byLineageHead.values()).sort((a, b) => a.name.localeCompare(b.name))
+
+    const groupsByName = new Map<
+      string,
+      { id: string; name: string; ids: Set<string>; latestCreatedAt: string }
+    >()
+
+    for (const group of groupsByRoot.values()) {
+      const key = group.name.trim().toLowerCase()
+      const existing = groupsByName.get(key)
+      if (!existing) {
+        groupsByName.set(key, {
+          id: group.id,
+          name: group.name,
+          ids: new Set(group.ids),
+          latestCreatedAt: group.latestCreatedAt,
+        })
+      } else {
+        for (const id of group.ids) existing.ids.add(id)
+        if (group.latestCreatedAt > existing.latestCreatedAt) {
+          existing.id = group.id
+          existing.name = group.name
+          existing.latestCreatedAt = group.latestCreatedAt
+        }
+      }
+    }
+
+    return Array.from(groupsByName.values())
+      .map((group) => ({ id: group.id, name: group.name, ids: Array.from(group.ids).sort() }))
+      .sort((a, b) => a.name.localeCompare(b.name))
   }, [allEx.data])
 
-  const selectedLineage = useMemo(() => {
-    if (!selectedId || !allEx.data) return []
-    return resolveExerciseLineage(selectedId, allEx.data)
-  }, [selectedId, allEx.data])
+  const hist = useExerciseHistory(selectedGroup?.ids ?? [])
 
-  const hist = useExerciseHistory(selectedLineage)
-
-  if (selectedId) {
+  if (selectedGroup) {
     return (
       <Screen
         title="History"
         action={
-          <button onClick={() => setSelectedId(null)} className="text-sm text-[color:var(--color-muted)] underline">
+          <button
+            onClick={() => setSelectedGroup(null)}
+            className="text-sm text-[color:var(--color-muted)] underline"
+          >
             Back
           </button>
         }
@@ -88,7 +125,7 @@ export function HistoryView() {
           {latestByLogicalName.map((e) => (
             <li key={e.id}>
               <button
-                onClick={() => setSelectedId(e.id)}
+                onClick={() => setSelectedGroup(e)}
                 className="w-full text-left px-3 py-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:bg-white/5 min-h-[52px]"
               >
                 {e.name}
