@@ -17,7 +17,10 @@
       "Bash(tee /tmp/tsc-out.txt)",
       "Bash(echo \"EXIT=$?\")",
       "Bash(npm run *)",
-      "Bash(git stash *)"
+      "Bash(git stash *)",
+      "Bash(supabase migration *)",
+      "Bash(git mv *)",
+      "Bash(supabase db *)"
     ]
   }
 }

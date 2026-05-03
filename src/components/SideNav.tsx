@@ -1,7 +1,6 @@
 import { useView, type ViewKey } from '@/lib/view'
 
 const tabs: { key: ViewKey; label: string }[] = [
-  { key: 'today', label: 'Today' },
   { key: 'history', label: 'History' },
   { key: 'plan', label: 'Plan' },
   { key: 'stats', label: 'Stats' },

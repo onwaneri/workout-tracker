@@ -1,3 +1,4 @@
+import { useEffect, useSyncExternalStore } from 'react'
 import { useView } from '@/lib/view'
 import { BottomTabs } from '@/components/BottomTabs'
 import { SideNav } from '@/components/SideNav'
@@ -6,8 +7,31 @@ import { HistoryView } from '@/features/history/HistoryView'
 import { PlanEditorView } from '@/features/plan-editor/PlanEditorView'
 import { StatsView } from '@/features/stats/StatsView'
 
+const DESKTOP_QUERY = '(min-width: 768px)'
+
+function useIsDesktop() {
+  return useSyncExternalStore(
+    (cb) => {
+      const mql = window.matchMedia(DESKTOP_QUERY)
+      mql.addEventListener('change', cb)
+      return () => mql.removeEventListener('change', cb)
+    },
+    () => window.matchMedia(DESKTOP_QUERY).matches,
+    () => false,
+  )
+}
+
 function CurrentView() {
   const view = useView((s) => s.view)
+  const setView = useView((s) => s.setView)
+  const isDesktop = useIsDesktop()
+
+  useEffect(() => {
+    if (isDesktop && view === 'today') setView('history')
+  }, [isDesktop, view, setView])
+
+  if (isDesktop && view === 'today') return null
+
   switch (view) {
     case 'today':
       return <TodayView />
