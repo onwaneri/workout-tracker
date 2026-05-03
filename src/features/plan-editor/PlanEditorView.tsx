@@ -6,6 +6,10 @@ import { useAllExercises } from '@/lib/queries/exercises'
 import { buildEditedPlanFromDb, snapshotPlan, type EditedDay, type EditedPlan } from './snapshotPlan'
 import { useQueryClient } from '@tanstack/react-query'
 import { DayEditor } from './DayEditor'
+import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
+import { AiPlanChat } from './AiPlanChat'
+import { applyAiDiff } from './applyAiDiff'
+import type { PlanEditAction } from '@/lib/ai/schemas'
 
 export function PlanEditorView() {
   const qc = useQueryClient()
@@ -117,6 +121,20 @@ export function PlanEditorView() {
       <p className="mt-6 text-xs text-[color:var(--color-muted)]">
         Saving creates a new plan version. In-progress sessions stay on the previous version.
       </p>
+
+      {isAiFeaturesEnabled() && (
+        <AiPlanChat
+          draft={draft}
+          onApplyDiff={(actions: PlanEditAction[]) => {
+            try {
+              const updated = applyAiDiff(draft, actions)
+              setDraft(updated)
+            } catch {
+              // If diff application fails, don't crash — user can still edit manually
+            }
+          }}
+        />
+      )}
     </Screen>
   )
 }
