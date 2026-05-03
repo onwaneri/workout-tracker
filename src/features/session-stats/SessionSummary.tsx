@@ -26,6 +26,13 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
 
   const history = useExerciseHistory(lineageIds)
 
+  const setsThisSession = sets.data ?? []
+  const priorSets = useMemo(
+    () => (history.data ?? []).filter((s) => s.session_id !== sessionId),
+    [history.data, sessionId],
+  )
+  const prs = useMemo(() => detectPRs(setsThisSession, priorSets), [setsThisSession, priorSets])
+
   if (!sess.data || !sets.data || !dayExercises.data) {
     return (
       <Screen title="Summary">
@@ -40,10 +47,6 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
       : 0
   const offApp = sess.data.background_ms ?? 0
 
-  const setsThisSession = sets.data
-  const priorSets = (history.data ?? []).filter((s) => s.session_id !== sessionId)
-
-  const prs = useMemo(() => detectPRs(setsThisSession, priorSets), [setsThisSession, priorSets])
   const muscleVolume = volumeByMuscleGroup(setsThisSession, dayExercises.data)
   const total = totalVolume(setsThisSession)
 
