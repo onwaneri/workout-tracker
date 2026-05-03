@@ -1,16 +1,20 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useSession } from './sessionStore'
 import { useExercises } from '@/lib/queries/exercises'
 import { useSessionSets, useEndSession, useLogSet, useUpdateSetRest } from '@/lib/queries/sessions'
+import { useSessionSwaps, useCreateSwap } from '@/lib/queries/swaps'
 import { SetRow } from './SetRow'
 import { useVisibilityTracking } from './useVisibilityTracking'
 import { useRestNotification, scheduleRestNotification, cancelRestNotification } from './useRestNotification'
 import { restTargetSeconds } from './restTargets'
 import { RestTimerBanner } from './RestTimerBanner'
+import { ExerciseSwapSheet } from './ExerciseSwapSheet'
 import { fmtDuration } from '@/lib/format'
+import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import type { Exercise } from '@/lib/supabase/database.types'
+import type { SwapSuggestion } from '@/lib/ai/schemas'
 
 export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
   const session = useSession()
@@ -23,10 +27,14 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
 
   const exercises = useExercises(workoutDayId ?? undefined)
   const sets = useSessionSets(sessionId ?? undefined)
+  const swaps = useSessionSwaps(sessionId ?? undefined)
+  const createSwap = useCreateSwap()
 
   const endSession = useEndSession()
   const logSet = useLogSet()
   const updateRest = useUpdateSetRest()
+
+  const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
 
   const groups = useMemo(() => {
     const sorted = [...(exercises.data ?? [])].sort((a, b) => a.order_index - b.order_index)
@@ -47,6 +55,32 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
     }
     return m
   }, [sets.data])
+
+  // Map of planned_exercise_id -> swap info for display
+  const swapMap = useMemo(() => {
+    const m = new Map<string, { name: string; muscle_group: string; type: string }>()
+    for (const s of swaps.data ?? []) {
+      m.set(s.planned_exercise_id, {
+        name: s.performed_exercise_name,
+        muscle_group: s.performed_muscle_group,
+        type: s.performed_type,
+      })
+    }
+    return m
+  }, [swaps.data])
+
+  const handleSwapConfirm = async (suggestion: SwapSuggestion) => {
+    if (!swapTarget || !sessionId) return
+    await createSwap.mutateAsync({
+      session_id: sessionId,
+      planned_exercise_id: swapTarget.id,
+      performed_exercise_name: suggestion.name,
+      performed_muscle_group: suggestion.muscle_group,
+      performed_type: suggestion.type,
+      reason: null, // reason is captured in the sheet but we store it on the swap row
+    })
+    setSwapTarget(null)
+  }
 
   const finalizeRest = useCallback(() => {
     const t = useSession.getState().restTimer
@@ -139,23 +173,41 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
             {g.map((e) => {
               const skipped = skippedIds.has(e.id)
               const count = setsByExercise.get(e.id) ?? 0
+              const swap = swapMap.get(e.id)
+              const displayName = swap?.name ?? e.name
+              const displayMuscle = swap?.muscle_group ?? e.muscle_group
               return (
                 <div key={e.id} className={g.length > 1 ? 'mb-4 last:mb-0' : ''}>
                   <div className="flex items-center justify-between mb-2">
                     <div>
-                      <div className="font-medium">{e.name}</div>
+                      <div className="font-medium">
+                        {displayName}
+                        {swap && (
+                          <span className="ml-2 text-xs text-purple-300/80 font-normal">(swapped)</span>
+                        )}
+                      </div>
                       <div className="text-xs text-[color:var(--color-muted)]">
-                        {e.muscle_group} · {e.type} · {count}/{e.default_sets} sets
+                        {displayMuscle} · {e.type} · {count}/{e.default_sets} sets
                       </div>
                     </div>
-                    {!skipped && (
-                      <button
-                        className="text-xs text-[color:var(--color-muted)] underline min-h-[44px] px-2"
-                        onClick={() => onSkip(e)}
-                      >
-                        Skip
-                      </button>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {!skipped && isAiFeaturesEnabled() && !swap && (
+                        <button
+                          className="text-xs text-purple-300 underline min-h-[44px] px-2"
+                          onClick={() => setSwapTarget(e)}
+                        >
+                          Swap
+                        </button>
+                      )}
+                      {!skipped && (
+                        <button
+                          className="text-xs text-[color:var(--color-muted)] underline min-h-[44px] px-2"
+                          onClick={() => onSkip(e)}
+                        >
+                          Skip
+                        </button>
+                      )}
+                    </div>
                   </div>
                   {skipped ? (
                     <div className="text-xs text-red-300/80">Skipped</div>
@@ -170,6 +222,15 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
       </ul>
 
       {restTimer && <RestTimerBanner timer={restTimer} onSkip={finalizeRest} />}
+
+      {swapTarget && (
+        <ExerciseSwapSheet
+          exercise={swapTarget}
+          open={!!swapTarget}
+          onClose={() => setSwapTarget(null)}
+          onSwap={handleSwapConfirm}
+        />
+      )}
     </Screen>
   )
 }

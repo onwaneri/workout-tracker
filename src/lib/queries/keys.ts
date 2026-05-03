@@ -13,4 +13,5 @@ export const qk = {
   sessionSets: (sessionId: string) => ['session-sets', c(), sessionId] as const,
   exerciseHistory: (exerciseId: string) => ['exercise-history', c(), exerciseId] as const,
   goals: () => ['goals', c()] as const,
+  sessionSwaps: (sessionId: string) => ['session-swaps', c(), sessionId] as const,
 }

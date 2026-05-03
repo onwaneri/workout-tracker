@@ -5,6 +5,7 @@ import { useSession, useSessionSets } from '@/lib/queries/sessions'
 import { useExercises } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
+import { useSessionSwaps } from '@/lib/queries/swaps'
 import { totalVolume, volumeByMuscleGroup } from '@/lib/stats/volume'
 import { totalRestMs } from '@/lib/stats/rest'
 import { detectPRs } from '@/lib/stats/prs'
@@ -14,6 +15,7 @@ import { Confetti } from './Confetti'
 export function SessionSummary({ sessionId, onClose }: { sessionId: string; onClose: () => void }) {
   const sess = useSession(sessionId)
   const sets = useSessionSets(sessionId)
+  const swaps = useSessionSwaps(sessionId)
   const dayExercises = useExercises(sess.data?.workout_day_id)
   const allEx = useAllExercises()
 
@@ -124,6 +126,22 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
             {skippedExercises.map((e) => (
               <li key={e.id}>{e.name}</li>
             ))}
+          </ul>
+        </Section>
+      )}
+
+      {(swaps.data ?? []).length > 0 && (
+        <Section title="Swaps">
+          <ul className="space-y-1.5 text-sm">
+            {(swaps.data ?? []).map((s) => {
+              const planned = dayExercises.data?.find((e) => e.id === s.planned_exercise_id)
+              return (
+                <li key={s.id} className="flex justify-between">
+                  <span className="text-[color:var(--color-muted)] line-through">{planned?.name ?? 'Unknown'}</span>
+                  <span>{s.performed_exercise_name}</span>
+                </li>
+              )
+            })}
           </ul>
         </Section>
       )}
