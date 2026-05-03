@@ -81,6 +81,18 @@ export type Goal = {
   created_at: string
 }
 
+export type SessionExerciseSwap = {
+  id: string
+  session_id: string
+  planned_exercise_id: string
+  performed_exercise_name: string
+  performed_muscle_group: string
+  performed_type: ExerciseType
+  reason: string | null
+  client_uuid: string
+  created_at: string
+}
+
 type Table<Row, Insert, Update = Partial<Row>> = {
   Row: Row
   Insert: Insert
@@ -154,6 +166,17 @@ type GoalInsert = {
   id?: string
   created_at?: string
 }
+type SessionExerciseSwapInsert = {
+  session_id: string
+  planned_exercise_id: string
+  performed_exercise_name: string
+  performed_muscle_group: string
+  performed_type: ExerciseType
+  reason?: string | null
+  client_uuid: string
+  id?: string
+  created_at?: string
+}
 
 export type Database = {
   __InternalSupabase: { PostgrestVersion: '12' }
@@ -166,6 +189,7 @@ export type Database = {
       sessions: Table<Session, SessionInsert>
       session_sets: Table<SessionSet, SessionSetInsert>
       goals: Table<Goal, GoalInsert>
+      session_exercise_swaps: Table<SessionExerciseSwap, SessionExerciseSwapInsert>
     }
     Views: Record<never, never>
     Functions: Record<never, never>
