@@ -31,6 +31,12 @@ async function fetchWorkoutDays(planVersionId: string): Promise<WorkoutDay[]> {
   return data ?? []
 }
 
+async function fetchAllWorkoutDays(): Promise<WorkoutDay[]> {
+  const { data, error } = await supabase.from('workout_days').select('*')
+  if (error) throw error
+  return data ?? []
+}
+
 export const usePlans = () => useQuery({ queryKey: qk.plans(), queryFn: fetchPlans })
 
 export const useActivePlanVersion = () =>
@@ -42,3 +48,6 @@ export const useWorkoutDays = (planVersionId: string | undefined) =>
     queryFn: () => fetchWorkoutDays(planVersionId!),
     enabled: !!planVersionId,
   })
+
+export const useAllWorkoutDays = () =>
+  useQuery({ queryKey: qk.workoutDaysAll(), queryFn: fetchAllWorkoutDays })

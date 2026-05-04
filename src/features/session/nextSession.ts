@@ -1,5 +1,18 @@
 import type { Session, WorkoutDay } from '@/lib/supabase/database.types'
 
+// Returns true if the most recent session was completed today (calendar-day comparison).
+export function completedToday(sessions: Session[]): boolean {
+  const last = sessions[0] // ordered DESC by started_at
+  if (!last || !last.ended_at) return false
+  const today = new Date()
+  const sessionDate = new Date(last.ended_at)
+  return (
+    sessionDate.getFullYear() === today.getFullYear() &&
+    sessionDate.getMonth() === today.getMonth() &&
+    sessionDate.getDate() === today.getDate()
+  )
+}
+
 // Rolling-position next session: based on last completed (or in-progress) session,
 // advance through plan_version's day order, skipping rest days.
 export function pickNextWorkoutDay(days: WorkoutDay[], sessions: Session[]): WorkoutDay | null {

@@ -177,6 +177,30 @@ export const useLogSet = () => {
   })
 }
 
+export const useCancelSession = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { id: string }) => {
+      const filter = { id: input.id }
+      try {
+        const { error } = await supabase.from('sessions').delete().eq('id', input.id)
+        if (error) throw error
+      } catch (err) {
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'sessions', op: 'delete', payload: {}, filter })
+          return
+        }
+        throw err
+      }
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: qk.sessions() })
+      qc.invalidateQueries({ queryKey: qk.session(vars.id) })
+      qc.invalidateQueries({ queryKey: qk.sessionSets(vars.id) })
+    },
+  })
+}
+
 export const useUpdateSetRest = () => {
   const qc = useQueryClient()
   return useMutation({

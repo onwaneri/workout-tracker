@@ -3,7 +3,7 @@ import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useSession } from './sessionStore'
 import { useExercises } from '@/lib/queries/exercises'
-import { useSessionSets, useEndSession, useLogSet, useUpdateSetRest } from '@/lib/queries/sessions'
+import { useSessionSets, useEndSession, useLogSet, useUpdateSetRest, useCancelSession } from '@/lib/queries/sessions'
 import { useSessionSwaps, useCreateSwap } from '@/lib/queries/swaps'
 import { SetRow } from './SetRow'
 import { useVisibilityTracking } from './useVisibilityTracking'
@@ -16,7 +16,7 @@ import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import type { Exercise } from '@/lib/supabase/database.types'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
 
-export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
+export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) {
   const session = useSession()
   const sessionId = session.activeSessionId
   const workoutDayId = session.workoutDayId
@@ -33,6 +33,7 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
   const endSession = useEndSession()
   const logSet = useLogSet()
   const updateRest = useUpdateSetRest()
+  const cancelSession = useCancelSession()
 
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
 
@@ -152,6 +153,15 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
     onComplete()
   }
 
+  const onCancelClick = async () => {
+    if (!window.confirm('Cancel workout? All logged sets will be discarded.')) return
+    cancelRestNotification()
+    session.clearRest()
+    await cancelSession.mutateAsync({ id: sessionId })
+    session.clear()
+    onCancel()
+  }
+
   const elapsed = session.startedAt ? Date.now() - session.startedAt : 0
 
   return (
@@ -167,7 +177,7 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
         Elapsed {fmtDuration(elapsed)} · Off-app {fmtDuration(session.backgroundMs)}
       </div>
 
-      <ul className="space-y-4 pb-32">
+      <ul className="space-y-4 mb-4">
         {groups.map((g, i) => (
           <li key={i} className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
             {g.map((e) => {
@@ -220,6 +230,17 @@ export function ActiveSessionView({ onComplete }: { onComplete: () => void }) {
           </li>
         ))}
       </ul>
+
+      <div className="pb-32">
+        <Button
+          variant="danger"
+          className="w-full"
+          onClick={onCancelClick}
+          disabled={cancelSession.isPending}
+        >
+          {cancelSession.isPending ? 'Cancelling…' : 'Cancel workout'}
+        </Button>
+      </div>
 
       {restTimer && <RestTimerBanner timer={restTimer} onSkip={finalizeRest} />}
 

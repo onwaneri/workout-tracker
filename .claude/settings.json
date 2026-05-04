@@ -20,7 +20,9 @@
       "Bash(git stash *)",
       "Bash(supabase migration *)",
       "Bash(git mv *)",
-      "Bash(supabase db *)"
+      "Bash(supabase db *)",
+      "Bash(supabase --version)",
+      "Bash(supabase status *)"
     ]
   }
 }

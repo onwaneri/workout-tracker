@@ -5,12 +5,15 @@ import { useExerciseHistory } from '@/lib/queries/sessions'
 import { fmtDate, fmtDuration, fmtWeight } from '@/lib/format'
 import { avgRestMs, totalRestMs } from '@/lib/stats/rest'
 import { ExerciseChart } from './ExerciseChart'
+import { PastSessionsList } from './PastSessionsList'
 
 type HistoryGroup = { id: string; name: string; ids: string[] }
+type Tab = 'exercises' | 'sessions'
 
 export function HistoryView() {
   const allEx = useAllExercises()
   const [selectedGroup, setSelectedGroup] = useState<HistoryGroup | null>(null)
+  const [tab, setTab] = useState<Tab>('exercises')
 
   const latestByLogicalName = useMemo(() => {
     if (!allEx.data) return []
@@ -128,7 +131,28 @@ export function HistoryView() {
 
   return (
     <Screen title="History">
-      {latestByLogicalName.length === 0 ? (
+      <div className="mb-4 inline-flex rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-0.5">
+        {(['exercises', 'sessions'] as Tab[]).map((t) => {
+          const active = tab === t
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`min-h-[36px] px-3 text-xs rounded-md ${
+                active
+                  ? 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]'
+                  : 'text-[color:var(--color-muted)]'
+              }`}
+            >
+              {t === 'exercises' ? 'Exercises' : 'Sessions'}
+            </button>
+          )
+        })}
+      </div>
+
+      {tab === 'sessions' ? (
+        <PastSessionsList />
+      ) : latestByLogicalName.length === 0 ? (
         <p className="text-sm text-[color:var(--color-muted)]">No exercises yet.</p>
       ) : (
         <ul className="space-y-1.5">

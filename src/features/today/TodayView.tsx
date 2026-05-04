@@ -6,7 +6,7 @@ import { useSessions, useStartSession } from '@/lib/queries/sessions'
 import { useExercises } from '@/lib/queries/exercises'
 import { useSession } from '@/features/session/sessionStore'
 import { ActiveSessionView } from '@/features/session/ActiveSessionView'
-import { pickNextWorkoutDay } from '@/features/session/nextSession'
+import { pickNextWorkoutDay, completedToday } from '@/features/session/nextSession'
 import { restTargetSeconds } from '@/features/session/restTargets'
 import { fmtDuration } from '@/lib/format'
 import { SessionSummary } from '@/features/session-stats/SessionSummary'
@@ -30,6 +30,11 @@ export function TodayView() {
   const nextDay = useMemo(
     () => (days.data && sessions.data ? pickNextWorkoutDay(days.data, sessions.data) : null),
     [days.data, sessions.data],
+  )
+
+  const doneForToday = useMemo(
+    () => (sessions.data ? completedToday(sessions.data) : false),
+    [sessions.data],
   )
 
   const [selectedDayId, setSelectedDayId] = useState<string | null>(null)
@@ -70,6 +75,10 @@ export function TodayView() {
           const id = session.activeSessionId
           session.clear()
           if (id) setCompletedSessionId(id)
+        }}
+        onCancel={() => {
+          session.clear()
+          setCompletedSessionId(null)
         }}
       />
     )
@@ -155,28 +164,61 @@ export function TodayView() {
       </div>
 
       <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
-        <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">
-          {isOffNext ? 'Picked workout' : 'Next session'}
-        </div>
-        <div className="mt-1 text-xl font-semibold">{activeDay.name}</div>
-        <div className="mt-1 text-xs text-[color:var(--color-muted)]">
-          ~{fmtDuration(estimatedMs)} · {exs.length} exercises
-        </div>
-        <ul className="mt-4 space-y-1 text-sm">
-          {exs.map((e) => (
-            <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
-              <span>{e.name}</span>
-              <span className="text-xs text-[color:var(--color-muted)]">
-                {e.default_sets}× · {e.type}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="mt-5">
-          <Button size="lg" variant="primary" className="w-full" onClick={onStart} disabled={startSession.isPending}>
-            {startSession.isPending ? 'Starting…' : 'Start session'}
-          </Button>
-        </div>
+        {doneForToday && !isOffNext ? (
+          <>
+            <div className="text-xs uppercase tracking-wide text-green-400">Done for today</div>
+            <div className="mt-2 text-sm text-[color:var(--color-muted)]">
+              Nice work. Rest up and come back tomorrow.
+            </div>
+            <div className="mt-4 border-t border-[color:var(--color-border)] pt-4">
+              <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Up next</div>
+              <div className="mt-1 text-lg font-semibold">{activeDay.name}</div>
+              <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+                ~{fmtDuration(estimatedMs)} · {exs.length} exercises
+              </div>
+              <ul className="mt-3 space-y-1 text-sm">
+                {exs.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
+                    <span>{e.name}</span>
+                    <span className="text-xs text-[color:var(--color-muted)]">
+                      {e.default_sets}× · {e.type}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="mt-5">
+              <Button size="lg" variant="secondary" className="w-full" onClick={onStart} disabled={startSession.isPending}>
+                {startSession.isPending ? 'Starting…' : 'Start anyway'}
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">
+              {isOffNext ? 'Picked workout' : 'Next session'}
+            </div>
+            <div className="mt-1 text-xl font-semibold">{activeDay.name}</div>
+            <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+              ~{fmtDuration(estimatedMs)} · {exs.length} exercises
+            </div>
+            <ul className="mt-4 space-y-1 text-sm">
+              {exs.map((e) => (
+                <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
+                  <span>{e.name}</span>
+                  <span className="text-xs text-[color:var(--color-muted)]">
+                    {e.default_sets}× · {e.type}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-5">
+              <Button size="lg" variant="primary" className="w-full" onClick={onStart} disabled={startSession.isPending}>
+                {startSession.isPending ? 'Starting…' : 'Start session'}
+              </Button>
+            </div>
+          </>
+        )}
       </div>
 
       {sessions.data && sessions.data.length > 0 && (
