@@ -4,6 +4,7 @@ const tabs: { key: ViewKey; label: string }[] = [
   { key: 'history', label: 'History' },
   { key: 'plan', label: 'Plan' },
   { key: 'stats', label: 'Stats' },
+  { key: 'settings', label: 'Settings' },
 ]
 
 export function SideNav() {

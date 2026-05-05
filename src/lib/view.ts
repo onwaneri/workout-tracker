@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ViewKey = 'today' | 'history' | 'plan' | 'stats'
+export type ViewKey = 'today' | 'history' | 'plan' | 'stats' | 'settings'
 
 type ViewStore = {
   view: ViewKey

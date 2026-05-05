@@ -5,6 +5,7 @@ const tabs: { key: ViewKey; label: string; icon: string }[] = [
   { key: 'history', label: 'History', icon: '▤' },
   { key: 'plan', label: 'Plan', icon: '▢' },
   { key: 'stats', label: 'Stats', icon: '☰' },
+  { key: 'settings', label: 'Settings', icon: '⚙' },
 ]
 
 export function BottomTabs() {
@@ -14,7 +15,7 @@ export function BottomTabs() {
       className="md:hidden fixed bottom-0 inset-x-0 border-t border-[color:var(--color-border)] bg-[color:var(--color-bg)]/95 backdrop-blur z-20"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
-      <ul className="grid grid-cols-4">
+      <ul className="grid grid-cols-5">
         {tabs.map((t) => {
           const active = view === t.key
           return (
