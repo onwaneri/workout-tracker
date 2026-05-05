@@ -41,6 +41,25 @@ async function fetchExerciseHistory(exerciseIds: string[]): Promise<SessionSet[]
   return data ?? []
 }
 
+async function fetchLastSetsForExercises(
+  exerciseIds: string[],
+): Promise<Record<string, SessionSet>> {
+  if (exerciseIds.length === 0) return {}
+  const { data, error } = await supabase
+    .from('session_sets')
+    .select('*')
+    .in('exercise_id', exerciseIds)
+    .eq('is_warmup', false)
+    .eq('is_skipped', false)
+    .order('logged_at', { ascending: false })
+  if (error) throw error
+  const out: Record<string, SessionSet> = {}
+  for (const s of data ?? []) {
+    if (!out[s.exercise_id]) out[s.exercise_id] = s
+  }
+  return out
+}
+
 export const useSessions = () => useQuery({ queryKey: qk.sessions(), queryFn: fetchSessions })
 
 export const useSession = (id: string | undefined) =>
@@ -59,6 +78,15 @@ export const useExerciseHistory = (exerciseIds: string[]) =>
     queryFn: () => fetchExerciseHistory(exerciseIds),
     enabled: exerciseIds.length > 0,
   })
+
+export const useLastSetsForExercises = (exerciseIds: string[]) => {
+  const joined = [...exerciseIds].sort().join(',')
+  return useQuery({
+    queryKey: qk.lastSetsFor(joined),
+    queryFn: () => fetchLastSetsForExercises(exerciseIds),
+    enabled: exerciseIds.length > 0,
+  })
+}
 
 export const useStartSession = () => {
   const qc = useQueryClient()
@@ -173,6 +201,7 @@ export const useLogSet = () => {
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: qk.sessionSets(s.session_id) })
       qc.invalidateQueries({ queryKey: qk.exerciseHistory(s.exercise_id) })
+      qc.invalidateQueries({ queryKey: qk.lastSets() })
     },
   })
 }

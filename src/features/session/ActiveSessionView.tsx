@@ -3,7 +3,14 @@ import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useSession } from './sessionStore'
 import { useExercises } from '@/lib/queries/exercises'
-import { useSessionSets, useEndSession, useLogSet, useUpdateSetRest, useCancelSession } from '@/lib/queries/sessions'
+import {
+  useSessionSets,
+  useEndSession,
+  useLogSet,
+  useUpdateSetRest,
+  useCancelSession,
+  useLastSetsForExercises,
+} from '@/lib/queries/sessions'
 import { useSessionSwaps, useCreateSwap } from '@/lib/queries/swaps'
 import { SetRow } from './SetRow'
 import { useVisibilityTracking } from './useVisibilityTracking'
@@ -29,6 +36,11 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   const sets = useSessionSets(sessionId ?? undefined)
   const swaps = useSessionSwaps(sessionId ?? undefined)
   const createSwap = useCreateSwap()
+  const exerciseIds = useMemo(
+    () => (exercises.data ?? []).map((e) => e.id),
+    [exercises.data],
+  )
+  const lastSets = useLastSetsForExercises(exerciseIds)
 
   const endSession = useEndSession()
   const logSet = useLogSet()
@@ -56,6 +68,27 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     }
     return m
   }, [sets.data])
+
+  const prefillByExercise = useMemo(() => {
+    const fmt = (n: number | null) => (n == null ? '' : String(n))
+    const m = new Map<string, { weight: string; reps: string; rpe: string }>()
+    // Prefer most recent non-warmup, non-skipped set in the current session.
+    const sortedCurrent = [...(sets.data ?? [])].sort(
+      (a, b) => b.set_order - a.set_order,
+    )
+    for (const s of sortedCurrent) {
+      if (s.is_warmup || s.is_skipped) continue
+      if (m.has(s.exercise_id)) continue
+      m.set(s.exercise_id, { weight: fmt(s.weight), reps: fmt(s.reps), rpe: fmt(s.rpe) })
+    }
+    // Fall back to the last set ever logged for this exercise.
+    const last = lastSets.data ?? {}
+    for (const [exId, s] of Object.entries(last)) {
+      if (m.has(exId)) continue
+      m.set(exId, { weight: fmt(s.weight), reps: fmt(s.reps), rpe: fmt(s.rpe) })
+    }
+    return m
+  }, [sets.data, lastSets.data])
 
   // Map of planned_exercise_id -> swap info for display
   const swapMap = useMemo(() => {
@@ -222,7 +255,11 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
                   {skipped ? (
                     <div className="text-xs text-red-300/80">Skipped</div>
                   ) : (
-                    <SetRow setNumber={count + 1} onLog={(p) => onLogSet(e, p)} />
+                    <SetRow
+                      setNumber={count + 1}
+                      prefill={prefillByExercise.get(e.id) ?? null}
+                      onLog={(p) => onLogSet(e, p)}
+                    />
                   )}
                 </div>
               )

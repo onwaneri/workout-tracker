@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/Button'
 
 export type SetDraft = {
@@ -9,17 +9,39 @@ export type SetDraft = {
   note: string
 }
 
+export type SetPrefill = {
+  weight: string
+  reps: string
+  rpe: string
+}
+
 const empty: SetDraft = { weight: '', reps: '', rpe: '', isWarmup: false, note: '' }
 
 export function SetRow({
   setNumber,
+  prefill,
   onLog,
 }: {
   setNumber: number
+  prefill?: SetPrefill | null
   onLog: (s: { weight: number | null; reps: number | null; rpe: number | null; isWarmup: boolean; note: string | null }) => void
 }) {
-  const [d, setD] = useState<SetDraft>(empty)
+  const [d, setD] = useState<SetDraft>(() =>
+    prefill
+      ? { weight: prefill.weight, reps: prefill.reps, rpe: prefill.rpe, isWarmup: false, note: '' }
+      : empty,
+  )
   const [showNote, setShowNote] = useState(false)
+
+  // Seed empty inputs from prefill when it loads/changes (e.g. history fetch resolves
+  // after first render). Don't overwrite values the user has already typed.
+  useEffect(() => {
+    if (!prefill) return
+    setD((prev) => {
+      if (prev.weight !== '' || prev.reps !== '' || prev.rpe !== '') return prev
+      return { ...prev, weight: prefill.weight, reps: prefill.reps, rpe: prefill.rpe }
+    })
+  }, [prefill])
 
   const submit = () => {
     onLog({
@@ -29,7 +51,7 @@ export function SetRow({
       isWarmup: d.isWarmup,
       note: d.note.trim() === '' ? null : d.note.trim(),
     })
-    setD(empty)
+    setD({ weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: false, note: '' })
     setShowNote(false)
   }
 

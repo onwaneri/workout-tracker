@@ -1,12 +1,14 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useSessions, useCancelSession } from '@/lib/queries/sessions'
 import { useAllWorkoutDays } from '@/lib/queries/plans'
 import { fmtDate, fmtDuration } from '@/lib/format'
+import { SessionDetail } from './SessionDetail'
 
 export function PastSessionsList() {
   const sessions = useSessions()
   const days = useAllWorkoutDays()
   const cancel = useCancelSession()
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const dayNameById = useMemo(() => {
     const m = new Map<string, string>()
@@ -23,7 +25,14 @@ export function PastSessionsList() {
     return <p className="text-sm text-[color:var(--color-muted)]">No sessions yet.</p>
   }
 
-  const onDelete = (id: string, label: string) => {
+  if (selectedId) {
+    const selected = items.find((s) => s.id === selectedId)
+    const name = selected ? dayNameById.get(selected.workout_day_id) ?? 'Workout' : 'Workout'
+    return <SessionDetail sessionId={selectedId} dayName={name} onBack={() => setSelectedId(null)} />
+  }
+
+  const onDelete = (e: React.MouseEvent, id: string, label: string) => {
+    e.stopPropagation()
     if (!window.confirm(`Delete ${label}? All sets from this session will be removed.`)) return
     cancel.mutate({ id })
   }
@@ -39,7 +48,8 @@ export function PastSessionsList() {
         return (
           <li
             key={s.id}
-            className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)]"
+            onClick={() => setSelectedId(s.id)}
+            className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] cursor-pointer active:bg-white/5"
           >
             <div className="min-w-0">
               <div className="text-sm font-medium truncate">{name}</div>
@@ -50,7 +60,7 @@ export function PastSessionsList() {
               </div>
             </div>
             <button
-              onClick={() => onDelete(s.id, label)}
+              onClick={(e) => onDelete(e, s.id, label)}
               disabled={cancel.isPending}
               className="text-xs text-red-300 underline min-h-[44px] px-2 disabled:opacity-50"
             >

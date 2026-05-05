@@ -13,6 +13,8 @@ export const qk = {
   session: (id: string) => ['session', c(), id] as const,
   sessionSets: (sessionId: string) => ['session-sets', c(), sessionId] as const,
   exerciseHistory: (exerciseId: string) => ['exercise-history', c(), exerciseId] as const,
+  lastSets: () => ['last-sets', c()] as const,
+  lastSetsFor: (joined: string) => ['last-sets', c(), joined] as const,
   goals: () => ['goals', c()] as const,
   sessionSwaps: (sessionId: string) => ['session-swaps', c(), sessionId] as const,
 }
