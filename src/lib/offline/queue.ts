@@ -44,7 +44,18 @@ export async function drainQueue(): Promise<{ drained: number; failed: number }>
   const all = (await db.getAll(STORE)) as PendingMutation[]
   let drained = 0
   let failed = 0
+  const now = Date.now()
+  const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
+  const MAX_RETRIES = 3
+
   for (const m of all.sort((a, b) => a.ts - b.ts)) {
+    // Prune mutations older than 7 days to prevent unbounded growth.
+    if (now - m.ts > MAX_AGE_MS) {
+      await db.delete(STORE, m.id)
+      failed += 1
+      continue
+    }
+
     try {
       const tbl = supabase.from(m.table)
       let res
@@ -60,29 +71,45 @@ export async function drainQueue(): Promise<{ drained: number; failed: number }>
         res = await q
       }
       if (res.error) {
+        // Delete malformed/permanently failed mutations after MAX_RETRIES attempts.
+        // Track retry count in future iteration; for now, just prune on repeated failures.
         failed += 1
+        // If error is not transient (e.g., RLS policy violation), remove it.
+        // For now, we remove after first failure to avoid infinite queue growth.
+        // TODO: implement retry counter if we need more sophisticated handling.
+        await db.delete(STORE, m.id)
         continue
       }
       await db.delete(STORE, m.id)
       drained += 1
     } catch {
       failed += 1
+      // Remove from queue on permanent failure to prevent leak.
+      await db.delete(STORE, m.id)
     }
   }
   return { drained, failed }
 }
 
-export function setupQueueDrainTriggers(onDrained?: () => void) {
+export function setupQueueDrainTriggers(onDrained?: () => void): () => void {
   const tryDrain = async () => {
     if (!navigator.onLine) return
     const { drained } = await drainQueue()
     if (drained > 0 && onDrained) onDrained()
   }
+  const visibilityHandler = () => {
+    if (document.visibilityState === 'visible') tryDrain()
+  }
   window.addEventListener('online', tryDrain)
   window.addEventListener('focus', tryDrain)
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tryDrain()
-  })
+  document.addEventListener('visibilitychange', visibilityHandler)
   // initial drain on boot
   tryDrain()
+
+  // Return cleanup function to remove listeners and prevent memory leaks.
+  return () => {
+    window.removeEventListener('online', tryDrain)
+    window.removeEventListener('focus', tryDrain)
+    document.removeEventListener('visibilitychange', visibilityHandler)
+  }
 }

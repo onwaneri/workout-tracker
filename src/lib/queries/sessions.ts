@@ -45,6 +45,7 @@ async function fetchLastSetsForExercises(
   exerciseIds: string[],
 ): Promise<Record<string, SessionSet>> {
   if (exerciseIds.length === 0) return {}
+  // Limit to 200 recent sets to avoid fetching unbounded history — we only need the most recent per exercise.
   const { data, error } = await supabase
     .from('session_sets')
     .select('*')
@@ -52,6 +53,7 @@ async function fetchLastSetsForExercises(
     .eq('is_warmup', false)
     .eq('is_skipped', false)
     .order('logged_at', { ascending: false })
+    .limit(200)
   if (error) throw error
   const out: Record<string, SessionSet> = {}
   for (const s of data ?? []) {
@@ -72,12 +74,15 @@ export const useSessionSets = (sessionId: string | undefined) =>
     enabled: !!sessionId,
   })
 
-export const useExerciseHistory = (exerciseIds: string[]) =>
-  useQuery({
-    queryKey: qk.exerciseHistory(exerciseIds.join(',')),
+export const useExerciseHistory = (exerciseIds: string[]) => {
+  // Sort IDs to ensure stable query key even if caller passes a new array with same contents.
+  const joined = [...exerciseIds].sort().join(',')
+  return useQuery({
+    queryKey: qk.exerciseHistory(joined),
     queryFn: () => fetchExerciseHistory(exerciseIds),
     enabled: exerciseIds.length > 0,
   })
+}
 
 export const useLastSetsForExercises = (exerciseIds: string[]) => {
   const joined = [...exerciseIds].sort().join(',')
@@ -200,7 +205,8 @@ export const useLogSet = () => {
     },
     onSuccess: (s) => {
       qc.invalidateQueries({ queryKey: qk.sessionSets(s.session_id) })
-      qc.invalidateQueries({ queryKey: qk.exerciseHistory(s.exercise_id) })
+      // Invalidate all exercise-history queries (prefix match) since we don't know which lineage this exercise belongs to.
+      qc.invalidateQueries({ queryKey: ['exercise-history'] })
       qc.invalidateQueries({ queryKey: qk.lastSets() })
     },
   })

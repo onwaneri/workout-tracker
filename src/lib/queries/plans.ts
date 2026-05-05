@@ -37,17 +37,28 @@ async function fetchAllWorkoutDays(): Promise<WorkoutDay[]> {
   return data ?? []
 }
 
-export const usePlans = () => useQuery({ queryKey: qk.plans(), queryFn: fetchPlans })
+// Plan data changes infrequently (only on user edits). Use a longer stale time to reduce refetches.
+export const usePlans = () =>
+  useQuery({ queryKey: qk.plans(), queryFn: fetchPlans, staleTime: 5 * 60 * 1000 })
 
 export const useActivePlanVersion = () =>
-  useQuery({ queryKey: qk.activePlanVersion(), queryFn: fetchActivePlanVersion })
+  useQuery({
+    queryKey: qk.activePlanVersion(),
+    queryFn: fetchActivePlanVersion,
+    staleTime: 5 * 60 * 1000,
+  })
 
 export const useWorkoutDays = (planVersionId: string | undefined) =>
   useQuery({
     queryKey: qk.workoutDays(planVersionId ?? ''),
     queryFn: () => fetchWorkoutDays(planVersionId!),
     enabled: !!planVersionId,
+    staleTime: 5 * 60 * 1000, // Workout days are static within a plan version.
   })
 
 export const useAllWorkoutDays = () =>
-  useQuery({ queryKey: qk.workoutDaysAll(), queryFn: fetchAllWorkoutDays })
+  useQuery({
+    queryKey: qk.workoutDaysAll(),
+    queryFn: fetchAllWorkoutDays,
+    staleTime: 5 * 60 * 1000,
+  })

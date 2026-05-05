@@ -1,14 +1,18 @@
-import { useMemo, useState } from 'react'
+import { lazy, Suspense, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
 import { fmtDate, fmtDuration, fmtWeight } from '@/lib/format'
 import { avgRestMs, totalRestMs } from '@/lib/stats/rest'
-import { ExerciseChart } from './ExerciseChart'
 import { PastSessionsList } from './PastSessionsList'
+
+// Lazy-load Recharts (heavy ~100KB+) only for desktop users who will see the chart
+const ExerciseChart = lazy(() => import('./ExerciseChart').then((m) => ({ default: m.ExerciseChart })))
 
 type HistoryGroup = { id: string; name: string; ids: string[] }
 type Tab = 'exercises' | 'sessions'
+
+const TABS: Tab[] = ['exercises', 'sessions']
 
 export function HistoryView() {
   const allEx = useAllExercises()
@@ -18,13 +22,22 @@ export function HistoryView() {
   const latestByLogicalName = useMemo(() => {
     if (!allEx.data) return []
 
+    // Memoize lineage resolution to avoid O(N²) complexity
+    const lineageCache = new Map<string, string[]>()
+    const getLineage = (id: string) => {
+      if (!lineageCache.has(id)) {
+        lineageCache.set(id, resolveExerciseLineage(id, allEx.data))
+      }
+      return lineageCache.get(id)!
+    }
+
     const groupsByRoot = new Map<
       string,
       { id: string; name: string; ids: Set<string>; latestCreatedAt: string }
     >()
 
     for (const e of allEx.data) {
-      const lineage = resolveExerciseLineage(e.id, allEx.data)
+      const lineage = getLineage(e.id)
       const root = lineage[lineage.length - 1] ?? e.id
       const existing = groupsByRoot.get(root)
       if (!existing) {
@@ -90,7 +103,9 @@ export function HistoryView() {
         }
       >
         <div className="hidden md:block mb-4">
-          <ExerciseChart sets={hist.data ?? []} />
+          <Suspense fallback={<div className="h-64 flex items-center justify-center text-sm text-[color:var(--color-muted)]">Loading chart...</div>}>
+            <ExerciseChart sets={hist.data ?? []} />
+          </Suspense>
         </div>
         {hist.data && hist.data.length > 0 ? (
           <>
@@ -132,7 +147,7 @@ export function HistoryView() {
   return (
     <Screen title="History">
       <div className="mb-4 inline-flex rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-0.5">
-        {(['exercises', 'sessions'] as Tab[]).map((t) => {
+        {TABS.map((t) => {
           const active = tab === t
           return (
             <button

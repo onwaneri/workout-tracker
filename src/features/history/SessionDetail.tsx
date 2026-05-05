@@ -48,16 +48,23 @@ export function SessionDetail({
     return Array.from(grouped.values())
   }, [sets.data, dayExercises.data, swaps.data])
 
-  if (!sess.data || !sets.data || !dayExercises.data) {
+  // Memoize computed session stats to avoid recalculating on every render
+  const sessionStats = useMemo(() => {
+    if (!sess.data || !sets.data) return null
+
+    const durationMs =
+      sess.data.ended_at && sess.data.started_at
+        ? new Date(sess.data.ended_at).getTime() - new Date(sess.data.started_at).getTime()
+        : null
+    const workingSets = sets.data.filter((s) => !s.is_warmup && !s.is_skipped)
+    const volume = totalVolume(sets.data)
+
+    return { durationMs, workingSets, volume }
+  }, [sess.data, sets.data])
+
+  if (!sess.data || !sets.data || !dayExercises.data || !sessionStats) {
     return <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
   }
-
-  const durationMs =
-    sess.data.ended_at && sess.data.started_at
-      ? new Date(sess.data.ended_at).getTime() - new Date(sess.data.started_at).getTime()
-      : null
-  const workingSets = sets.data.filter((s) => !s.is_warmup && !s.is_skipped)
-  const volume = totalVolume(sets.data)
 
   return (
     <div>
@@ -69,9 +76,9 @@ export function SessionDetail({
         <div className="text-lg font-semibold">{dayName}</div>
         <div className="text-xs text-[color:var(--color-muted)] mt-1">
           {fmtDate(sess.data.started_at)}
-          {durationMs != null && <> · {fmtDuration(durationMs)}</>}
-          {' · '}{workingSets.length} sets
-          {volume > 0 && <> · {Math.round(volume).toLocaleString()} lb</>}
+          {sessionStats.durationMs != null && <> · {fmtDuration(sessionStats.durationMs)}</>}
+          {' · '}{sessionStats.workingSets.length} sets
+          {sessionStats.volume > 0 && <> · {Math.round(sessionStats.volume).toLocaleString()} lb</>}
         </div>
       </div>
 

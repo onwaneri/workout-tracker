@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useSessions, useCancelSession } from '@/lib/queries/sessions'
 import { useAllWorkoutDays } from '@/lib/queries/plans'
 import { fmtDate, fmtDuration } from '@/lib/format'
@@ -16,33 +16,44 @@ export function PastSessionsList() {
     return m
   }, [days.data])
 
+  // Memoize session list items with computed durations to avoid recalculating on every render
+  const sessionItems = useMemo(() => {
+    return (sessions.data ?? []).map((s) => {
+      const durationMs =
+        s.ended_at && s.started_at ? new Date(s.ended_at).getTime() - new Date(s.started_at).getTime() : null
+      return { ...s, durationMs }
+    })
+  }, [sessions.data])
+
+  const onDelete = useCallback(
+    (e: React.MouseEvent, id: string, label: string) => {
+      e.stopPropagation()
+      if (!window.confirm(`Delete ${label}? All sets from this session will be removed.`)) return
+      cancel.mutate({ id })
+    },
+    [cancel],
+  )
+
+  const handleBack = useCallback(() => setSelectedId(null), [])
+
   if (sessions.isLoading) {
     return <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
   }
 
-  const items = sessions.data ?? []
-  if (items.length === 0) {
+  if (sessionItems.length === 0) {
     return <p className="text-sm text-[color:var(--color-muted)]">No sessions yet.</p>
   }
 
   if (selectedId) {
-    const selected = items.find((s) => s.id === selectedId)
+    const selected = sessionItems.find((s) => s.id === selectedId)
     const name = selected ? dayNameById.get(selected.workout_day_id) ?? 'Workout' : 'Workout'
-    return <SessionDetail sessionId={selectedId} dayName={name} onBack={() => setSelectedId(null)} />
-  }
-
-  const onDelete = (e: React.MouseEvent, id: string, label: string) => {
-    e.stopPropagation()
-    if (!window.confirm(`Delete ${label}? All sets from this session will be removed.`)) return
-    cancel.mutate({ id })
+    return <SessionDetail sessionId={selectedId} dayName={name} onBack={handleBack} />
   }
 
   return (
     <ul className="space-y-2">
-      {items.map((s) => {
+      {sessionItems.map((s) => {
         const name = dayNameById.get(s.workout_day_id) ?? 'Workout'
-        const durationMs =
-          s.ended_at && s.started_at ? new Date(s.ended_at).getTime() - new Date(s.started_at).getTime() : null
         const inProgress = !s.ended_at
         const label = `${name} · ${fmtDate(s.started_at)}`
         return (
@@ -55,7 +66,7 @@ export function PastSessionsList() {
               <div className="text-sm font-medium truncate">{name}</div>
               <div className="text-xs text-[color:var(--color-muted)]">
                 {fmtDate(s.started_at)}
-                {durationMs != null && <> · {fmtDuration(durationMs)}</>}
+                {s.durationMs != null && <> · {fmtDuration(s.durationMs)}</>}
                 {inProgress && <> · in progress</>}
               </div>
             </div>

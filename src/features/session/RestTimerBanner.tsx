@@ -11,10 +11,12 @@ const formatMMSS = (seconds: number): string => {
 export function RestTimerBanner({ timer, onSkip }: { timer: RestTimer; onSkip: () => void }) {
   const [now, setNow] = useState(() => Date.now())
 
+  // Update every second for MM:SS display — no need for sub-second precision.
+  // Empty deps: one interval for component lifetime, updates based on current timer state.
   useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 250)
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
-  }, [timer.setId])
+  }, [])
 
   const elapsedMs = now - timer.startedAt
   const targetMs = timer.targetSeconds * 1000

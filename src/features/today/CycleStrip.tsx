@@ -35,6 +35,14 @@ export function CycleStrip({
     return out
   }, [workoutDays, nextDayId])
 
+  // Clear stale refs when chips change to prevent memory leak from retained DOM nodes.
+  useEffect(() => {
+    const currentOffsets = new Set(chips.map((c) => c.offset))
+    for (const offset of chipRefs.current.keys()) {
+      if (!currentOffsets.has(offset)) chipRefs.current.delete(offset)
+    }
+  }, [chips])
+
   const activeOffset = useMemo(() => {
     if (selectedDayId == null) return 0
     const match = chips.find((c) => c.offset >= 0 && c.day.id === selectedDayId)

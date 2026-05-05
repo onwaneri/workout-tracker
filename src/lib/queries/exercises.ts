@@ -27,11 +27,18 @@ export const useExercises = (workoutDayId: string | undefined) =>
     queryKey: qk.exercises(workoutDayId ?? ''),
     queryFn: () => fetchExercises(workoutDayId!),
     enabled: !!workoutDayId,
+    staleTime: 5 * 60 * 1000, // Exercises are static within a workout day.
   })
 
-export const useAllExercises = () => useQuery({ queryKey: qk.exercisesAll(), queryFn: fetchAllExercises })
+export const useAllExercises = () =>
+  useQuery({
+    queryKey: qk.exercisesAll(),
+    queryFn: fetchAllExercises,
+    staleTime: 5 * 60 * 1000,
+  })
 
 // Walks previous_exercise_id chain so renamed/reordered exercises share history.
+// NOTE: This function rebuilds maps on every call. Ensure it's wrapped in useMemo at call sites.
 export function resolveExerciseLineage(targetId: string, all: Exercise[]): string[] {
   const byId = new Map(all.map((e) => [e.id, e] as const))
   const byPrev = new Map<string, Exercise[]>()

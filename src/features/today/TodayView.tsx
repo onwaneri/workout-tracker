@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
@@ -13,6 +13,7 @@ import { SessionSummary } from '@/features/session-stats/SessionSummary'
 import { useEnsurePlan } from '@/lib/seed/useEnsurePlan'
 import { CycleStrip } from './CycleStrip'
 import { PickAnotherView } from './PickAnotherView'
+import type { WorkoutDay } from '@/lib/supabase/database.types'
 
 export function TodayView() {
   const seed = useEnsurePlan()
@@ -49,6 +50,39 @@ export function TodayView() {
   const [completedSessionId, setCompletedSessionId] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const [pickerBusyDayId, setPickerBusyDayId] = useState<string | null>(null)
+
+  // Stabilize callbacks to prevent child re-renders.
+  const handleSelectDay = useCallback((offset: number, day: WorkoutDay) => {
+    setSelectedDayId(offset === 0 ? null : day.id)
+  }, [])
+
+  const handlePickAnother = useCallback(
+    async (day: WorkoutDay) => {
+      if (!pv.data) return
+      setPickerBusyDayId(day.id)
+      try {
+        const result = await startSession.mutateAsync({
+          plan_version_id: pv.data.id,
+          workout_day_id: day.id,
+        })
+        session.setActive({ sessionId: result.id, workoutDayId: day.id, startedAt: Date.now() })
+        setShowPicker(false)
+        setPickerBusyDayId(null)
+      } catch {
+        setPickerBusyDayId(null)
+      }
+    },
+    [pv.data, startSession, session],
+  )
+
+  const handleStart = useCallback(async () => {
+    if (!pv.data || !activeDay) return
+    const result = await startSession.mutateAsync({
+      plan_version_id: pv.data.id,
+      workout_day_id: activeDay.id,
+    })
+    session.setActive({ sessionId: result.id, workoutDayId: activeDay.id, startedAt: Date.now() })
+  }, [pv.data, activeDay, startSession, session])
 
   if (seed.status === 'seeding' || seed.status === 'idle') {
     return (
@@ -104,21 +138,7 @@ export function TodayView() {
           setShowPicker(false)
           setPickerBusyDayId(null)
         }}
-        onPick={async (day) => {
-          if (!pv.data) return
-          setPickerBusyDayId(day.id)
-          try {
-            const result = await startSession.mutateAsync({
-              plan_version_id: pv.data.id,
-              workout_day_id: day.id,
-            })
-            session.setActive({ sessionId: result.id, workoutDayId: day.id, startedAt: Date.now() })
-            setShowPicker(false)
-            setPickerBusyDayId(null)
-          } catch {
-            setPickerBusyDayId(null)
-          }
-        }}
+        onPick={handlePickAnother}
       />
     )
   }
@@ -135,15 +155,6 @@ export function TodayView() {
   const estimatedMs = exs.reduce((acc, e) => acc + e.default_sets * restTargetSeconds(e.type) * 1000, 0)
   const isOffNext = activeDay.id !== nextDay.id
 
-  const onStart = async () => {
-    if (!pv.data || !activeDay) return
-    const result = await startSession.mutateAsync({
-      plan_version_id: pv.data.id,
-      workout_day_id: activeDay.id,
-    })
-    session.setActive({ sessionId: result.id, workoutDayId: activeDay.id, startedAt: Date.now() })
-  }
-
   return (
     <Screen title="Today">
       <div className="mb-4">
@@ -151,7 +162,7 @@ export function TodayView() {
           workoutDays={workoutDays}
           nextDayId={nextDay.id}
           selectedDayId={selectedDayId}
-          onSelect={(offset, day) => setSelectedDayId(offset === 0 ? null : day.id)}
+          onSelect={handleSelectDay}
         />
         {isOffNext && (
           <button
@@ -188,7 +199,7 @@ export function TodayView() {
               </ul>
             </div>
             <div className="mt-5">
-              <Button size="lg" variant="secondary" className="w-full" onClick={onStart} disabled={startSession.isPending}>
+              <Button size="lg" variant="secondary" className="w-full" onClick={handleStart} disabled={startSession.isPending}>
                 {startSession.isPending ? 'Starting…' : 'Start anyway'}
               </Button>
             </div>
@@ -213,7 +224,7 @@ export function TodayView() {
               ))}
             </ul>
             <div className="mt-5">
-              <Button size="lg" variant="primary" className="w-full" onClick={onStart} disabled={startSession.isPending}>
+              <Button size="lg" variant="primary" className="w-full" onClick={handleStart} disabled={startSession.isPending}>
                 {startSession.isPending ? 'Starting…' : 'Start session'}
               </Button>
             </div>

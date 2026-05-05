@@ -49,14 +49,20 @@ export function cancelRestNotification(): void {
 export function useRestNotification(activeSessionId: string | null) {
   const [permission, setPermission] = useState<NotifPermission>(getPermission())
 
+  // Stabilize ensure callback — activeSessionId is the only real dependency.
   const ensure = useCallback(async () => {
     if (!activeSessionId) return
     const next = await maybeRequestPermission(activeSessionId)
     setPermission(next)
   }, [activeSessionId])
 
+  // Effect runs when session starts; ensure is stable so no cycle.
   useEffect(() => {
     if (activeSessionId) ensure()
+    // Cleanup: reset permission state when session ends to avoid stale state.
+    return () => {
+      if (!activeSessionId) setPermission(getPermission())
+    }
   }, [activeSessionId, ensure])
 
   return { permission, ensure }

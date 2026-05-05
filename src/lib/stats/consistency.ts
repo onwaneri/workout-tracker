@@ -22,13 +22,11 @@ export function consistencyStreakWeeks(sessions: Session[], plannedPerWeek: numb
   // Walk backwards while each prior week hits >= plannedPerWeek.
   let streak = 0
   // Skip the in-progress week
-  week = new Date(week)
   week.setDate(week.getDate() - 7)
   while (true) {
     const inWeek = sessionsInWeek(sessions, week).filter((s) => s.ended_at).length
     if (inWeek >= plannedPerWeek) {
       streak += 1
-      week = new Date(week)
       week.setDate(week.getDate() - 7)
     } else {
       break

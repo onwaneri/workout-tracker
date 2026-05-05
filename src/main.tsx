@@ -12,8 +12,14 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
   registerSW({ immediate: true })
 }
 
-setupQueueDrainTriggers(() => {
-  queryClient.invalidateQueries()
+// Only invalidate queries likely affected by offline writes: sessions, session_sets, and related data.
+// Goals, plan edits, etc. are rare offline mutations and can use targeted invalidations if needed later.
+// Cleanup function not needed here since this runs once at app root, but kept for correctness.
+const cleanupOfflineQueue = setupQueueDrainTriggers(() => {
+  queryClient.invalidateQueries({ queryKey: ['sessions'] })
+  queryClient.invalidateQueries({ queryKey: ['session-sets'] })
+  queryClient.invalidateQueries({ queryKey: ['exercise-history'] })
+  queryClient.invalidateQueries({ queryKey: ['last-sets'] })
 })
 
 createRoot(document.getElementById('root')!).render(

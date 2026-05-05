@@ -25,10 +25,15 @@ import type { Exercise } from '@/lib/supabase/database.types'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
 
 export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => void; onCancel: () => void }) {
-  const session = useSession()
-  const sessionId = session.activeSessionId
-  const workoutDayId = session.workoutDayId
-  const restTimer = session.restTimer
+  // Extract stable methods from Zustand store to avoid recreating callbacks.
+  const sessionId = useSession((s) => s.activeSessionId)
+  const workoutDayId = useSession((s) => s.workoutDayId)
+  const restTimer = useSession((s) => s.restTimer)
+  const startRestFn = useSession((s) => s.startRest)
+  const clearRestFn = useSession((s) => s.clearRest)
+  const foregroundMs = useSession((s) => s.foregroundMs)
+  const backgroundMs = useSession((s) => s.backgroundMs)
+  const startedAt = useSession((s) => s.startedAt)
 
   useVisibilityTracking(sessionId !== null)
   useRestNotification(sessionId)
@@ -117,14 +122,15 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     setSwapTarget(null)
   }
 
+  // Stabilize finalizeRest by using extracted stable method references.
   const finalizeRest = useCallback(() => {
     const t = useSession.getState().restTimer
     if (!t || !sessionId) return
     const restMs = Math.max(0, Date.now() - t.startedAt)
     updateRest.mutate({ setId: t.setId, sessionId, restMs })
     cancelRestNotification()
-    session.clearRest()
-  }, [sessionId, updateRest, session])
+    clearRestFn()
+  }, [sessionId, updateRest, clearRestFn])
 
   if (!sessionId || !workoutDayId) {
     return null
@@ -151,7 +157,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     })
     if (!payload.isWarmup && target != null) {
       scheduleRestNotification(target, `Rest done — ${e.name}`)
-      session.startRest({
+      startRestFn({
         setId: inserted.id,
         exerciseId: e.id,
         exerciseName: e.name,
@@ -181,8 +187,8 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     finalizeRest()
     await endSession.mutateAsync({
       id: sessionId,
-      foreground_ms: session.foregroundMs,
-      background_ms: session.backgroundMs,
+      foreground_ms: foregroundMs,
+      background_ms: backgroundMs,
     })
     onComplete()
   }
@@ -190,13 +196,13 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   const onCancelClick = async () => {
     if (!window.confirm('Cancel workout? All logged sets will be discarded.')) return
     cancelRestNotification()
-    session.clearRest()
+    clearRestFn()
     await cancelSession.mutateAsync({ id: sessionId })
-    session.clear()
+    useSession.getState().clear()
     onCancel()
   }
 
-  const elapsed = session.startedAt ? Date.now() - session.startedAt : 0
+  const elapsed = startedAt ? Date.now() - startedAt : 0
 
   return (
     <Screen
@@ -208,7 +214,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       }
     >
       <div className="text-xs text-[color:var(--color-muted)] mb-4">
-        Elapsed {fmtDuration(elapsed)} · Off-app {fmtDuration(session.backgroundMs)}
+        Elapsed {fmtDuration(elapsed)} · Off-app {fmtDuration(backgroundMs)}
       </div>
 
       <ul className="space-y-4 mb-4">

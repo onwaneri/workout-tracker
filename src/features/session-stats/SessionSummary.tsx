@@ -35,6 +35,7 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
   )
   const prs = useMemo(() => detectPRs(setsThisSession, priorSets), [setsThisSession, priorSets])
 
+  // Wait for critical queries before rendering. History and allEx can load in background for PR detection.
   if (!sess.data || !sets.data || !dayExercises.data) {
     return (
       <Screen title="Summary">
@@ -54,9 +55,9 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
 
   const plannedSets = dayExercises.data.reduce((acc, e) => acc + e.default_sets, 0)
   const completedSets = setsThisSession.filter((s) => !s.is_warmup && !s.is_skipped).length
-  const skippedExercises = dayExercises.data.filter((e) =>
-    setsThisSession.some((s) => s.exercise_id === e.id && s.is_skipped),
-  )
+  // Build a Set of skipped exercise IDs to avoid O(exercises × sets) iteration.
+  const skippedExerciseIds = new Set(setsThisSession.filter((s) => s.is_skipped).map((s) => s.exercise_id))
+  const skippedExercises = dayExercises.data.filter((e) => skippedExerciseIds.has(e.id))
 
   return (
     <Screen
@@ -91,6 +92,7 @@ export function SessionSummary({ sessionId, onClose }: { sessionId: string; onCl
           <Empty>No working sets logged.</Empty>
         ) : (
           <ul className="space-y-1.5">
+            {/* Array.from returns a new array, so we can sort in-place without .slice() */}
             {Array.from(muscleVolume.entries())
               .sort((a, b) => b[1] - a[1])
               .map(([m, v]) => (

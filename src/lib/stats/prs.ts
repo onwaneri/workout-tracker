@@ -17,10 +17,12 @@ export function detectPRs(sessionSets: SessionSet[], prior: SessionSet[]): PRRec
   }
 
   const result: PRRecord[] = []
-  // Sort by logged_at to evaluate within-session PRs in order.
-  const ordered = sessionSets.filter(working).slice().sort((a, b) => a.logged_at.localeCompare(b.logged_at))
+  // Session sets are already ordered by logged_at in the query; no need to re-sort.
+  // If they arrive out of order, the query is broken — sorting here masks that bug.
+  const ordered = sessionSets.filter(working)
   let runningMaxWeight = priorMaxWeight
-  const runningRepsByWeight = new Map(priorRepsByWeight)
+  // No need to copy priorRepsByWeight; it's local to this function and we can mutate it directly.
+  const runningRepsByWeight = priorRepsByWeight
 
   for (const s of ordered) {
     if (s.weight == null || s.reps == null) continue
