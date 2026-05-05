@@ -19,6 +19,7 @@ import { restTargetSeconds } from './restTargets'
 import { RestTimerBanner } from './RestTimerBanner'
 import { ExerciseSwapSheet } from './ExerciseSwapSheet'
 import { fmtDuration } from '@/lib/format'
+import { BODYWEIGHT_LBS, isBodyweightExercise } from '@/lib/constants'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import type { Exercise } from '@/lib/supabase/database.types'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
@@ -258,6 +259,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
                     <SetRow
                       setNumber={count + 1}
                       prefill={prefillByExercise.get(e.id) ?? null}
+                      bodyweight={isBodyweightExercise(displayName) ? BODYWEIGHT_LBS : null}
                       onLog={(p) => onLogSet(e, p)}
                     />
                   )}

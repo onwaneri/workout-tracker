@@ -20,10 +20,12 @@ const empty: SetDraft = { weight: '', reps: '', rpe: '', isWarmup: false, note: 
 export function SetRow({
   setNumber,
   prefill,
+  bodyweight,
   onLog,
 }: {
   setNumber: number
   prefill?: SetPrefill | null
+  bodyweight?: number | null
   onLog: (s: { weight: number | null; reps: number | null; rpe: number | null; isWarmup: boolean; note: string | null }) => void
 }) {
   const [d, setD] = useState<SetDraft>(() =>
@@ -32,6 +34,7 @@ export function SetRow({
       : empty,
   )
   const [showNote, setShowNote] = useState(false)
+  const [useBw, setUseBw] = useState<boolean>(() => bodyweight != null)
 
   // Seed empty inputs from prefill when it loads/changes (e.g. history fetch resolves
   // after first render). Don't overwrite values the user has already typed.
@@ -44,14 +47,21 @@ export function SetRow({
   }, [prefill])
 
   const submit = () => {
+    const bwActive = useBw && bodyweight != null
     onLog({
-      weight: d.weight === '' ? null : Number(d.weight),
+      weight: bwActive ? bodyweight! : d.weight === '' ? null : Number(d.weight),
       reps: d.reps === '' ? null : Number(d.reps),
       rpe: d.rpe === '' ? null : Number(d.rpe),
       isWarmup: d.isWarmup,
       note: d.note.trim() === '' ? null : d.note.trim(),
     })
-    setD({ weight: d.weight, reps: d.reps, rpe: d.rpe, isWarmup: false, note: '' })
+    setD({
+      weight: bwActive ? '' : d.weight,
+      reps: d.reps,
+      rpe: d.rpe,
+      isWarmup: false,
+      note: '',
+    })
     setShowNote(false)
   }
 
@@ -59,13 +69,33 @@ export function SetRow({
     <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-bg)] p-3">
       <div className="flex items-center gap-2">
         <span className="text-xs uppercase tracking-wide text-[color:var(--color-muted)] w-8">#{setNumber}</span>
-        <input
-          inputMode="decimal"
-          placeholder="Weight"
-          value={d.weight}
-          onChange={(e) => setD({ ...d, weight: e.target.value })}
-          className="flex-1 min-w-0 bg-transparent text-base focus:outline-none"
-        />
+        {bodyweight != null && (
+          <button
+            type="button"
+            onClick={() => setUseBw((v) => !v)}
+            aria-pressed={useBw}
+            className={`text-xs px-2 py-1 rounded-md border ${
+              useBw
+                ? 'bg-[color:var(--color-accent)]/15 border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
+                : 'border-[color:var(--color-border)] text-[color:var(--color-muted)]'
+            }`}
+          >
+            BW
+          </button>
+        )}
+        {useBw && bodyweight != null ? (
+          <span className="flex-1 min-w-0 text-base text-[color:var(--color-muted)]">
+            BW · {bodyweight}
+          </span>
+        ) : (
+          <input
+            inputMode="decimal"
+            placeholder="Weight"
+            value={d.weight}
+            onChange={(e) => setD({ ...d, weight: e.target.value })}
+            className="flex-1 min-w-0 bg-transparent text-base focus:outline-none"
+          />
+        )}
         <span className="text-[color:var(--color-muted)] text-sm">×</span>
         <input
           inputMode="numeric"
