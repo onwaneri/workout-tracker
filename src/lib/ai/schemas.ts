@@ -69,3 +69,20 @@ export const exerciseSwapResponseSchema = z.object({
 
 export type SwapSuggestion = z.infer<typeof swapSuggestionSchema>
 export type ExerciseSwapResponse = z.infer<typeof exerciseSwapResponseSchema>
+
+// ─── Session Insights Schema ──────────────────────────────────────
+export const sessionInsightRowSchema = z.object({
+  exerciseName: z.string(),
+  delta: z.string(),
+  direction: z.enum(['up', 'down', 'same']),
+  note: z.string().optional(),
+})
+
+export const sessionInsightsSchema = z.object({
+  headline: z.string(),
+  rows: z.array(sessionInsightRowSchema),
+  callout: z.string().nullable(),
+})
+
+export type SessionInsightRow = z.infer<typeof sessionInsightRowSchema>
+export type SessionInsights = z.infer<typeof sessionInsightsSchema>

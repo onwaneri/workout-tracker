@@ -1,6 +1,6 @@
 import { getClientUuid } from '@/lib/supabase/uuid'
-import { aiPlanEditResultSchema, exerciseSwapResponseSchema } from './schemas'
-import type { AiPlanEditResult, ExerciseSwapResponse } from './schemas'
+import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema } from './schemas'
+import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights } from './schemas'
 import type { ExerciseType } from '@/lib/supabase/database.types'
 
 const AI_BASE = '/api/ai'
@@ -63,5 +63,25 @@ export async function requestExerciseSwap(
     '/exercise-swap',
     { exercise, reason },
     (data) => exerciseSwapResponseSchema.parse(data),
+  )
+}
+
+export type SessionInsightsPayload = {
+  workoutDayName: string
+  exercises: Array<{
+    name: string
+    muscle_group: string
+    current: { bestWeight: number | null; totalReps: number; avgRpe: number | null; workingSets: number }
+    prior: { bestWeight: number | null; totalReps: number; avgRpe: number | null; workingSets: number }
+  }>
+}
+
+export async function requestSessionInsights(
+  payload: SessionInsightsPayload,
+): Promise<SessionInsights> {
+  return aiPost(
+    '/session-insights',
+    payload,
+    (data) => sessionInsightsSchema.parse(data),
   )
 }

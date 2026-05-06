@@ -12,6 +12,7 @@ import { volumeByMuscleGroup } from '@/lib/stats/volume'
 import { avgRestMs } from '@/lib/stats/rest'
 import { fmtDuration, fmtVolume } from '@/lib/format'
 import { GoalsEditor } from '@/features/goals/GoalsEditor'
+import { CalendarHeatmap } from './CalendarHeatmap'
 
 export function StatsView() {
   const pv = useActivePlanVersion()
@@ -53,6 +54,10 @@ export function StatsView() {
 
   return (
     <Screen title="Stats">
+      <div className="mb-5">
+        <CalendarHeatmap sessions={sessions.data} />
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <Stat label="This week" value={`${completedThisWeek}/${plannedPerWeek}`} />
         <Stat label="Streak" value={`${streak}w`} />
