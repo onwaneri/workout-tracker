@@ -46,7 +46,7 @@ export async function drainQueue(): Promise<{ drained: number; failed: number }>
   let failed = 0
   const now = Date.now()
   const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
-  const MAX_RETRIES = 3
+  // const MAX_RETRIES = 3
 
   for (const m of all.sort((a, b) => a.ts - b.ts)) {
     // Prune mutations older than 7 days to prevent unbounded growth.
