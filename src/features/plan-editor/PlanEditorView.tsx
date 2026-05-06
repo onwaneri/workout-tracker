@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
-import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
+import { useActivePlanVersion, useWorkoutDays, usePlans, useSwitchActivePlan, useCreatePlan } from '@/lib/queries/plans'
 import { useAllExercises } from '@/lib/queries/exercises'
 import { buildEditedPlanFromDb, snapshotPlan, type EditedDay, type EditedPlan } from './snapshotPlan'
 import { useQueryClient } from '@tanstack/react-query'
@@ -11,17 +11,28 @@ import { AiPlanChat } from './AiPlanChat'
 import { applyAiDiff } from './applyAiDiff'
 import type { PlanEditAction } from '@/lib/ai/schemas'
 
+const MIN_DAYS = 3
+const MAX_DAYS = 10
+
 export function PlanEditorView() {
   const qc = useQueryClient()
+  const plans = usePlans()
   const pv = useActivePlanVersion()
   const days = useWorkoutDays(pv.data?.id)
   const allExercises = useAllExercises()
+  const switchPlan = useSwitchActivePlan()
+  const createPlan = useCreatePlan()
 
   const allLoaded = !!pv.data && !!days.data && !!allExercises.data
 
   const [draft, setDraft] = useState<EditedPlan | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
+
+  // New plan creation form state
+  const [showNewPlan, setShowNewPlan] = useState(false)
+  const [newPlanName, setNewPlanName] = useState('')
+  const [newPlanDays, setNewPlanDays] = useState(7)
 
   const exercisesByDay = useMemo(() => {
     const exMap = new Map<string, typeof allExercises.data extends infer T ? T extends readonly (infer U)[] ? U[] : never : never>()
@@ -60,6 +71,27 @@ export function PlanEditorView() {
     )
   }
 
+  const activePlanId = pv.data?.plan_id ?? null
+
+  const handleSwitchPlan = async (planId: string) => {
+    if (planId === activePlanId) return
+    if (draft && !window.confirm('Switch plans? Unsaved changes will be lost.')) return
+    setDraft(null)
+    setSavedMsg(null)
+    await switchPlan.mutateAsync(planId)
+  }
+
+  const handleCreatePlan = async () => {
+    const name = newPlanName.trim()
+    if (!name) return
+    setDraft(null)
+    setSavedMsg(null)
+    setShowNewPlan(false)
+    setNewPlanName('')
+    setNewPlanDays(7)
+    await createPlan.mutateAsync({ name, dayCount: newPlanDays })
+  }
+
   const updateDay = (idx: number, next: EditedDay) => {
     setDraft((d) => (d ? { ...d, days: d.days.map((x, i) => (i === idx ? next : x)) } : d))
   }
@@ -72,6 +104,21 @@ export function PlanEditorView() {
       const [m] = next.splice(from, 1)
       next.splice(to, 0, m)
       return { ...d, days: next }
+    })
+  }
+
+  const addDay = () => {
+    setDraft((d) => {
+      if (!d || d.days.length >= MAX_DAYS) return d
+      const n = d.days.length + 1
+      return { ...d, days: [...d.days, { name: `Day ${n}`, is_rest: false, exercises: [] }] }
+    })
+  }
+
+  const removeDay = (idx: number) => {
+    setDraft((d) => {
+      if (!d || d.days.length <= MIN_DAYS) return d
+      return { ...d, days: d.days.filter((_, i) => i !== idx) }
     })
   }
 
@@ -91,20 +138,86 @@ export function PlanEditorView() {
     }
   }
 
+  const busy = switchPlan.isPending || createPlan.isPending
+
   return (
     <Screen
       title="Plan"
       action={
-        <Button variant="primary" onClick={onSave} disabled={saving}>
+        <Button variant="primary" onClick={onSave} disabled={saving || busy}>
           {saving ? 'Saving…' : 'Save'}
         </Button>
       }
     >
+      {/* Plan switcher */}
+      <div className="-mx-4 px-4 mb-5">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {(plans.data ?? []).map((p) => (
+            <button
+              key={p.id}
+              onClick={() => handleSwitchPlan(p.id)}
+              disabled={busy}
+              className={`shrink-0 px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                p.id === activePlanId
+                  ? 'bg-[color:var(--color-accent)] border-[color:var(--color-accent)] text-white'
+                  : 'border-[color:var(--color-border)] text-[color:var(--color-muted)]'
+              }`}
+            >
+              {p.name}
+            </button>
+          ))}
+          <button
+            onClick={() => setShowNewPlan((s) => !s)}
+            className="shrink-0 px-3 py-1.5 rounded-full text-sm border border-dashed border-[color:var(--color-border)] text-[color:var(--color-muted)]"
+          >
+            + New
+          </button>
+        </div>
+
+        {showNewPlan && (
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            <input
+              value={newPlanName}
+              onChange={(e) => setNewPlanName(e.target.value)}
+              placeholder="Plan name"
+              className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none"
+              onKeyDown={(e) => { if (e.key === 'Enter') handleCreatePlan() }}
+              autoFocus
+            />
+            <div className="flex items-center gap-1 text-sm">
+              <button
+                onClick={() => setNewPlanDays((n) => Math.max(MIN_DAYS, n - 1))}
+                className="w-8 h-8 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-muted)]"
+              >
+                −
+              </button>
+              <span className="w-16 text-center">{newPlanDays} days</span>
+              <button
+                onClick={() => setNewPlanDays((n) => Math.min(MAX_DAYS, n + 1))}
+                className="w-8 h-8 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-muted)]"
+              >
+                +
+              </button>
+            </div>
+            <Button variant="primary" onClick={handleCreatePlan} disabled={!newPlanName.trim() || createPlan.isPending}>
+              Create
+            </Button>
+            <button
+              onClick={() => setShowNewPlan(false)}
+              className="text-sm text-[color:var(--color-muted)] underline"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
+      </div>
+
       {savedMsg && (
         <div className="mb-4 text-sm rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-2">
           {savedMsg}
         </div>
       )}
+
       <ul className="space-y-3">
         {draft.days.map((d, i) => (
           <li key={i}>
@@ -114,12 +227,27 @@ export function PlanEditorView() {
               onChange={(next) => updateDay(i, next)}
               onMoveUp={() => moveDay(i, i - 1)}
               onMoveDown={() => moveDay(i, i + 1)}
+              onRemove={draft.days.length > MIN_DAYS ? () => removeDay(i) : undefined}
             />
           </li>
         ))}
       </ul>
+
+      <div className="mt-3 flex items-center gap-3">
+        <Button
+          variant="secondary"
+          onClick={addDay}
+          disabled={draft.days.length >= MAX_DAYS}
+        >
+          + Add day
+        </Button>
+        <span className="text-xs text-[color:var(--color-muted)]">
+          {draft.days.length}/{MAX_DAYS} days
+        </span>
+      </div>
+
       <p className="mt-6 text-xs text-[color:var(--color-muted)]">
-        Saving creates a new plan version. In-progress sessions stay on the previous version.
+        Saving creates a new plan version and makes this plan active. In-progress sessions stay on the previous version.
       </p>
 
       {isAiFeaturesEnabled() && (

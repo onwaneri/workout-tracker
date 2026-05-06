@@ -29,11 +29,12 @@ export type EditedPlan = {
 export async function snapshotPlan(edited: EditedPlan): Promise<string> {
   const clientUuid = getClientUuid()
 
-  // 1) deactivate the prior version
+  // 1) deactivate all currently active versions so any plan switch is handled atomically
   const { error: deactErr } = await supabase
     .from('plan_versions')
     .update({ is_active: false })
-    .eq('id', edited.prevPlanVersionId)
+    .eq('client_uuid', clientUuid)
+    .eq('is_active', true)
   if (deactErr) throw deactErr
 
   // 2) create the new plan_version

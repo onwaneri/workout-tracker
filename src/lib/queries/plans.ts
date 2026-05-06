@@ -1,5 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
+import { getClientUuid } from '@/lib/supabase/uuid'
 import type { Plan, PlanVersion, WorkoutDay } from '@/lib/supabase/database.types'
 import { qk } from './keys'
 
@@ -62,3 +63,72 @@ export const useAllWorkoutDays = () =>
     queryFn: fetchAllWorkoutDays,
     staleTime: 5 * 60 * 1000,
   })
+
+export const useSwitchActivePlan = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (targetPlanId: string) => {
+      const clientUuid = getClientUuid()
+      const { error: deactErr } = await supabase
+        .from('plan_versions')
+        .update({ is_active: false })
+        .eq('client_uuid', clientUuid)
+        .eq('is_active', true)
+      if (deactErr) throw deactErr
+      const { data: pvs, error: pvErr } = await supabase
+        .from('plan_versions')
+        .select('*')
+        .eq('plan_id', targetPlanId)
+        .order('version_number', { ascending: false })
+        .limit(1)
+      if (pvErr) throw pvErr
+      const pv = pvs?.[0]
+      if (!pv) throw new Error('No version found for plan')
+      const { error: actErr } = await supabase
+        .from('plan_versions')
+        .update({ is_active: true })
+        .eq('id', pv.id)
+      if (actErr) throw actErr
+      return pv as PlanVersion
+    },
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+export const useCreatePlan = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ name, dayCount }: { name: string; dayCount: number }) => {
+      const clientUuid = getClientUuid()
+      const { error: deactErr } = await supabase
+        .from('plan_versions')
+        .update({ is_active: false })
+        .eq('client_uuid', clientUuid)
+        .eq('is_active', true)
+      if (deactErr) throw deactErr
+      const { data: plan, error: planErr } = await supabase
+        .from('plans')
+        .insert({ client_uuid: clientUuid, name })
+        .select('id')
+        .single()
+      if (planErr || !plan) throw planErr ?? new Error('plan insert failed')
+      const { data: pv, error: pvErr } = await supabase
+        .from('plan_versions')
+        .insert({ plan_id: plan.id, client_uuid: clientUuid, version_number: 1, is_active: true })
+        .select('id')
+        .single()
+      if (pvErr || !pv) throw pvErr ?? new Error('plan_version insert failed')
+      const dayRows = Array.from({ length: dayCount }, (_, i) => ({
+        plan_version_id: pv.id,
+        client_uuid: clientUuid,
+        name: `Day ${i + 1}`,
+        order_index: i,
+        is_rest: false,
+      }))
+      const { error: daysErr } = await supabase.from('workout_days').insert(dayRows)
+      if (daysErr) throw daysErr
+      return { planId: plan.id as string, planVersionId: pv.id as string }
+    },
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}

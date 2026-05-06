@@ -13,6 +13,18 @@ export function completedToday(sessions: Session[]): boolean {
   )
 }
 
+// Returns the immediate next day in the rolling cycle after the last session,
+// including rest days. Use this to detect whether the user is currently in a rest slot.
+export function pickNextDay(days: WorkoutDay[], sessions: Session[]): WorkoutDay | null {
+  if (days.length === 0) return null
+  const sorted = [...days].sort((a, b) => a.order_index - b.order_index)
+  const lastSession = sessions[0]
+  if (!lastSession) return sorted[0]
+  const lastIdx = sorted.findIndex((d) => d.id === lastSession.workout_day_id)
+  if (lastIdx === -1) return sorted[0]
+  return sorted[(lastIdx + 1) % sorted.length]
+}
+
 // Rolling-position next session: based on last completed (or in-progress) session,
 // advance through plan_version's day order, skipping rest days.
 export function pickNextWorkoutDay(days: WorkoutDay[], sessions: Session[]): WorkoutDay | null {

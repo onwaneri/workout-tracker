@@ -7,12 +7,14 @@ export function DayEditor({
   onChange,
   onMoveUp,
   onMoveDown,
+  onRemove,
 }: {
   day: EditedDay
   dayNumber: number
   onChange: (next: EditedDay) => void
   onMoveUp: () => void
   onMoveDown: () => void
+  onRemove?: () => void
 }) {
   const update = (patch: Partial<EditedDay>) => onChange({ ...day, ...patch })
 
@@ -63,6 +65,9 @@ export function DayEditor({
         </label>
         <button onClick={onMoveUp} className="min-h-[44px] min-w-[36px] text-[color:var(--color-muted)]" aria-label="Move day up">↑</button>
         <button onClick={onMoveDown} className="min-h-[44px] min-w-[36px] text-[color:var(--color-muted)]" aria-label="Move day down">↓</button>
+        {onRemove && (
+          <button onClick={onRemove} className="min-h-[44px] min-w-[36px] text-red-300" aria-label="Remove day">×</button>
+        )}
       </header>
 
       {!day.is_rest && (
