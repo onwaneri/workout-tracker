@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useActivePlanVersion, useWorkoutDays, usePlans, useSwitchActivePlan } from '@/lib/queries/plans'
@@ -69,19 +69,19 @@ export function PlanEditorView() {
 
   const activePlanId = pv.data?.plan_id ?? null
 
-  const handleSwitchPlan = useCallback(async (planId: string) => {
+  const handleSwitchPlan = async (planId: string) => {
     if (planId === activePlanId) return
     if (draft && !window.confirm('Switch plans? Unsaved changes will be lost.')) return
     setDraft(null)
     setSavedMsg(null)
     await switchPlan.mutateAsync(planId)
-  }, [activePlanId, draft, switchPlan])
+  }
 
-  const updateDay = useCallback((idx: number, next: EditedDay) => {
+  const updateDay = (idx: number, next: EditedDay) => {
     setDraft((d) => (d ? { ...d, days: d.days.map((x, i) => (i === idx ? next : x)) } : d))
-  }, [])
+  }
 
-  const moveDay = useCallback((from: number, to: number) => {
+  const moveDay = (from: number, to: number) => {
     setDraft((d) => {
       if (!d) return d
       if (to < 0 || to >= d.days.length) return d
@@ -90,22 +90,22 @@ export function PlanEditorView() {
       next.splice(to, 0, m)
       return { ...d, days: next }
     })
-  }, [])
+  }
 
-  const addDay = useCallback(() => {
+  const addDay = () => {
     setDraft((d) => {
       if (!d || d.days.length >= MAX_DAYS) return d
       const n = d.days.length + 1
       return { ...d, days: [...d.days, { name: `Day ${n}`, is_rest: false, exercises: [] }] }
     })
-  }, [])
+  }
 
-  const removeDay = useCallback((idx: number) => {
+  const removeDay = (idx: number) => {
     setDraft((d) => {
       if (!d || d.days.length <= MIN_DAYS) return d
       return { ...d, days: d.days.filter((_, i) => i !== idx) }
     })
-  }, [])
+  }
 
   const onSave = async () => {
     if (!draft) return
