@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
-import { useActivePlanVersion, useWorkoutDays, usePlans, useSwitchActivePlan, useCreatePlan } from '@/lib/queries/plans'
+import { useActivePlanVersion, useWorkoutDays, usePlans, useSwitchActivePlan } from '@/lib/queries/plans'
 import { useAllExercises } from '@/lib/queries/exercises'
 import { buildEditedPlanFromDb, snapshotPlan, type EditedDay, type EditedPlan } from './snapshotPlan'
 import { useQueryClient } from '@tanstack/react-query'
@@ -10,6 +10,7 @@ import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import { AiPlanChat } from './AiPlanChat'
 import { applyAiDiff } from './applyAiDiff'
 import type { PlanEditAction } from '@/lib/ai/schemas'
+import { useView } from '@/lib/view'
 
 const MIN_DAYS = 3
 const MAX_DAYS = 10
@@ -21,18 +22,13 @@ export function PlanEditorView() {
   const days = useWorkoutDays(pv.data?.id)
   const allExercises = useAllExercises()
   const switchPlan = useSwitchActivePlan()
-  const createPlan = useCreatePlan()
+  const setView = useView((s) => s.setView)
 
   const allLoaded = !!pv.data && !!days.data && !!allExercises.data
 
   const [draft, setDraft] = useState<EditedPlan | null>(null)
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
-
-  // New plan creation form state
-  const [showNewPlan, setShowNewPlan] = useState(false)
-  const [newPlanName, setNewPlanName] = useState('')
-  const [newPlanDays, setNewPlanDays] = useState(7)
 
   const exercisesByDay = useMemo(() => {
     const exMap = new Map<string, typeof allExercises.data extends infer T ? T extends readonly (infer U)[] ? U[] : never : never>()
@@ -81,17 +77,6 @@ export function PlanEditorView() {
     await switchPlan.mutateAsync(planId)
   }
 
-  const handleCreatePlan = async () => {
-    const name = newPlanName.trim()
-    if (!name) return
-    setDraft(null)
-    setSavedMsg(null)
-    setShowNewPlan(false)
-    setNewPlanName('')
-    setNewPlanDays(7)
-    await createPlan.mutateAsync({ name, dayCount: newPlanDays })
-  }
-
   const updateDay = (idx: number, next: EditedDay) => {
     setDraft((d) => (d ? { ...d, days: d.days.map((x, i) => (i === idx ? next : x)) } : d))
   }
@@ -138,7 +123,7 @@ export function PlanEditorView() {
     }
   }
 
-  const busy = switchPlan.isPending || createPlan.isPending
+  const busy = switchPlan.isPending
 
   return (
     <Screen
@@ -167,49 +152,12 @@ export function PlanEditorView() {
             </button>
           ))}
           <button
-            onClick={() => setShowNewPlan((s) => !s)}
+            onClick={() => setView('create-plan')}
             className="shrink-0 px-3 py-1.5 rounded-full text-sm border border-dashed border-[color:var(--color-border)] text-[color:var(--color-muted)]"
           >
             + New
           </button>
         </div>
-
-        {showNewPlan && (
-          <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <input
-              value={newPlanName}
-              onChange={(e) => setNewPlanName(e.target.value)}
-              placeholder="Plan name"
-              className="flex-1 min-w-0 bg-[color:var(--color-surface)] border border-[color:var(--color-border)] rounded-lg px-3 py-2 text-sm focus:outline-none"
-              onKeyDown={(e) => { if (e.key === 'Enter') handleCreatePlan() }}
-              autoFocus
-            />
-            <div className="flex items-center gap-1 text-sm">
-              <button
-                onClick={() => setNewPlanDays((n) => Math.max(MIN_DAYS, n - 1))}
-                className="w-8 h-8 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-muted)]"
-              >
-                −
-              </button>
-              <span className="w-16 text-center">{newPlanDays} days</span>
-              <button
-                onClick={() => setNewPlanDays((n) => Math.min(MAX_DAYS, n + 1))}
-                className="w-8 h-8 rounded-lg border border-[color:var(--color-border)] text-[color:var(--color-muted)]"
-              >
-                +
-              </button>
-            </div>
-            <Button variant="primary" onClick={handleCreatePlan} disabled={!newPlanName.trim() || createPlan.isPending}>
-              Create
-            </Button>
-            <button
-              onClick={() => setShowNewPlan(false)}
-              className="text-sm text-[color:var(--color-muted)] underline"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
       </div>
 
       {savedMsg && (

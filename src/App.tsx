@@ -7,6 +7,7 @@ import { HistoryView } from '@/features/history/HistoryView'
 import { PlanEditorView } from '@/features/plan-editor/PlanEditorView'
 import { StatsView } from '@/features/stats/StatsView'
 import { SettingsView } from '@/features/settings/SettingsView'
+import { CreatePlanView } from '@/features/plan-editor/CreatePlanView'
 
 const DESKTOP_QUERY = '(min-width: 768px)'
 
@@ -44,6 +45,8 @@ function CurrentView() {
       return <StatsView />
     case 'settings':
       return <SettingsView />
+    case 'create-plan':
+      return <CreatePlanView />
   }
 }
 

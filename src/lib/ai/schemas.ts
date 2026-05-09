@@ -86,3 +86,26 @@ export const sessionInsightsSchema = z.object({
 
 export type SessionInsightRow = z.infer<typeof sessionInsightRowSchema>
 export type SessionInsights = z.infer<typeof sessionInsightsSchema>
+
+// ─── Plan Generation Schema ─────────────────────────────────────
+export const generatedExerciseSchema = z.object({
+  name: z.string(),
+  muscle_group: z.string(),
+  type: z.enum(['compound', 'isolation']),
+  default_sets: z.number().int().min(1).max(10),
+})
+
+export const generatedDaySchema = z.object({
+  name: z.string(),
+  is_rest: z.boolean(),
+  exercises: z.array(generatedExerciseSchema),
+})
+
+export const generatedPlanSchema = z.object({
+  name: z.string(),
+  days: z.array(generatedDaySchema).min(3).max(10),
+})
+
+export type GeneratedExercise = z.infer<typeof generatedExerciseSchema>
+export type GeneratedDay = z.infer<typeof generatedDaySchema>
+export type GeneratedPlan = z.infer<typeof generatedPlanSchema>

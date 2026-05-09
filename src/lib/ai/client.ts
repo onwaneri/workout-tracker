@@ -1,6 +1,6 @@
 import { getClientUuid } from '@/lib/supabase/uuid'
-import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema } from './schemas'
-import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights } from './schemas'
+import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema, generatedPlanSchema } from './schemas'
+import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights, GeneratedPlan } from './schemas'
 import type { ExerciseType } from '@/lib/supabase/database.types'
 
 const AI_BASE = '/api/ai'
@@ -83,5 +83,15 @@ export async function requestSessionInsights(
     '/session-insights',
     payload,
     (data) => sessionInsightsSchema.parse(data),
+  )
+}
+
+export async function requestPlanGenerate(
+  prompt: string,
+): Promise<GeneratedPlan> {
+  return aiPost(
+    '/plan-generate',
+    { prompt },
+    (data) => generatedPlanSchema.parse(data),
   )
 }
