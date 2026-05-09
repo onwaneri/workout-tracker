@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useActivePlanVersion, useWorkoutDays, usePlans, useSwitchActivePlan } from '@/lib/queries/plans'
@@ -30,8 +30,9 @@ export function PlanEditorView() {
   const [saving, setSaving] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
 
+  type Exercise = NonNullable<typeof allExercises.data>[number]
   const exercisesByDay = useMemo(() => {
-    const exMap = new Map<string, typeof allExercises.data extends infer T ? T extends readonly (infer U)[] ? U[] : never : never>()
+    const exMap = new Map<string, Exercise[]>()
     if (allExercises.data && days.data) {
       const dayIdSet = new Set(days.data.map((d) => d.id))
       for (const e of allExercises.data) {
@@ -42,7 +43,6 @@ export function PlanEditorView() {
       }
     }
     return exMap
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allExercises.data, days.data])
 
   useEffect(() => {
@@ -69,19 +69,19 @@ export function PlanEditorView() {
 
   const activePlanId = pv.data?.plan_id ?? null
 
-  const handleSwitchPlan = async (planId: string) => {
+  const handleSwitchPlan = useCallback(async (planId: string) => {
     if (planId === activePlanId) return
     if (draft && !window.confirm('Switch plans? Unsaved changes will be lost.')) return
     setDraft(null)
     setSavedMsg(null)
     await switchPlan.mutateAsync(planId)
-  }
+  }, [activePlanId, draft, switchPlan])
 
-  const updateDay = (idx: number, next: EditedDay) => {
+  const updateDay = useCallback((idx: number, next: EditedDay) => {
     setDraft((d) => (d ? { ...d, days: d.days.map((x, i) => (i === idx ? next : x)) } : d))
-  }
+  }, [])
 
-  const moveDay = (from: number, to: number) => {
+  const moveDay = useCallback((from: number, to: number) => {
     setDraft((d) => {
       if (!d) return d
       if (to < 0 || to >= d.days.length) return d
@@ -90,22 +90,22 @@ export function PlanEditorView() {
       next.splice(to, 0, m)
       return { ...d, days: next }
     })
-  }
+  }, [])
 
-  const addDay = () => {
+  const addDay = useCallback(() => {
     setDraft((d) => {
       if (!d || d.days.length >= MAX_DAYS) return d
       const n = d.days.length + 1
       return { ...d, days: [...d.days, { name: `Day ${n}`, is_rest: false, exercises: [] }] }
     })
-  }
+  }, [])
 
-  const removeDay = (idx: number) => {
+  const removeDay = useCallback((idx: number) => {
     setDraft((d) => {
       if (!d || d.days.length <= MIN_DAYS) return d
       return { ...d, days: d.days.filter((_, i) => i !== idx) }
     })
-  }
+  }, [])
 
   const onSave = async () => {
     if (!draft) return
@@ -113,7 +113,10 @@ export function PlanEditorView() {
     setSavedMsg(null)
     try {
       await snapshotPlan(draft)
-      await qc.invalidateQueries()
+      await qc.invalidateQueries({ queryKey: ['plans'] })
+      await qc.invalidateQueries({ queryKey: ['plan-version'] })
+      await qc.invalidateQueries({ queryKey: ['workout-days'] })
+      await qc.invalidateQueries({ queryKey: ['exercises'] })
       setSavedMsg('Saved as new plan version.')
       setDraft(null)
     } catch (e) {
@@ -201,14 +204,14 @@ export function PlanEditorView() {
       {isAiFeaturesEnabled() && (
         <AiPlanChat
           draft={draft}
-          onApplyDiff={(actions: PlanEditAction[]) => {
+          onApplyDiff={useCallback((actions: PlanEditAction[]) => {
             try {
               const updated = applyAiDiff(draft, actions)
               setDraft(updated)
             } catch {
               // If diff application fails, don't crash — user can still edit manually
             }
-          }}
+          }, [draft])}
         />
       )}
     </Screen>

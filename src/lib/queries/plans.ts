@@ -91,7 +91,12 @@ export const useSwitchActivePlan = () => {
       if (actErr) throw actErr
       return pv as PlanVersion
     },
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plans'] })
+      qc.invalidateQueries({ queryKey: ['plan-version'] })
+      qc.invalidateQueries({ queryKey: ['workout-days'] })
+      qc.invalidateQueries({ queryKey: ['exercises'] })
+    },
   })
 }
 
@@ -129,6 +134,11 @@ export const useCreatePlan = () => {
       if (daysErr) throw daysErr
       return { planId: plan.id as string, planVersionId: pv.id as string }
     },
-    onSuccess: () => qc.invalidateQueries(),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['plans'] })
+      qc.invalidateQueries({ queryKey: ['plan-version'] })
+      qc.invalidateQueries({ queryKey: ['workout-days'] })
+      qc.invalidateQueries({ queryKey: ['exercises'] })
+    },
   })
 }

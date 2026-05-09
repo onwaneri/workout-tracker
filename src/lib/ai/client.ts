@@ -4,6 +4,7 @@ import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights, Generated
 import type { ExerciseType } from '@/lib/supabase/database.types'
 
 const AI_BASE = '/api/ai'
+const CLIENT_UUID = getClientUuid() // Evaluate once at module load to avoid redundant calls
 
 async function aiPost<T>(
   path: string,
@@ -14,7 +15,7 @@ async function aiPost<T>(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-client-uuid': getClientUuid(),
+      'x-client-uuid': CLIENT_UUID,
     },
     body: JSON.stringify(body),
   })

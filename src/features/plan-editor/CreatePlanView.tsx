@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useView } from '@/lib/view'
@@ -45,7 +45,7 @@ export function CreatePlanView() {
     }
   }, [])
 
-  const handleManualCreate = async () => {
+  const handleManualCreate = useCallback(async () => {
     const name = manualName.trim()
     if (!name) return
     setSaving(true)
@@ -56,7 +56,7 @@ export function CreatePlanView() {
       setError(e instanceof Error ? e.message : 'Failed to create plan')
       setSaving(false)
     }
-  }
+  }, [manualName, manualDays, createPlan, setView])
 
   const handleGenerate = async () => {
     if (!prompt.trim() || generating || !isOnline) return
@@ -72,6 +72,11 @@ export function CreatePlanView() {
       setGenerating(false)
     }
   }
+
+  const handleRegenerate = useCallback(() => {
+    setGeneratedPlan(null)
+    setError(null)
+  }, [])
 
   const handleSaveGenerated = async () => {
     if (!generatedPlan) return
@@ -101,7 +106,10 @@ export function CreatePlanView() {
       }
 
       await snapshotPlan(editedPlan)
-      await qc.invalidateQueries()
+      await qc.invalidateQueries({ queryKey: ['plans'] })
+      await qc.invalidateQueries({ queryKey: ['plan-version'] })
+      await qc.invalidateQueries({ queryKey: ['workout-days'] })
+      await qc.invalidateQueries({ queryKey: ['exercises'] })
       setView('plan')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to save plan')
@@ -278,10 +286,7 @@ export function CreatePlanView() {
                 <Button
                   variant="secondary"
                   className="flex-1"
-                  onClick={() => {
-                    setGeneratedPlan(null)
-                    setError(null)
-                  }}
+                  onClick={handleRegenerate}
                   disabled={busy}
                 >
                   Regenerate

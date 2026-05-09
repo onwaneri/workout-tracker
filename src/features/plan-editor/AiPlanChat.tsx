@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react'
 import { Button } from '@/components/Button'
 import { requestPlanEdit, type PlanSnapshot } from '@/lib/ai/client'
 import type { AiPlanEditResult, PlanEditAction } from '@/lib/ai/schemas'
@@ -39,7 +39,7 @@ export function AiPlanChat({
     }
   }, [])
 
-  const planSnapshot: PlanSnapshot = {
+  const planSnapshot = useMemo<PlanSnapshot>(() => ({
     days: draft.days.map((d) => ({
       name: d.name,
       is_rest: d.is_rest,
@@ -50,7 +50,7 @@ export function AiPlanChat({
         default_sets: e.default_sets,
       })),
     })),
-  }
+  }), [draft])
 
   const handleSubmit = async () => {
     if (!input.trim() || loading || !isOnline) return
@@ -97,10 +97,19 @@ export function AiPlanChat({
     }
   }
 
-  const handleReject = () => {
+  const handleReject = useCallback(() => {
     setPendingDiff(null)
     setMessages((msgs) => [...msgs, { role: 'assistant', content: 'Changes discarded. What else would you like to change?' }])
-  }
+  }, [])
+
+  const handleRetry = useCallback(() => {
+    setError(null)
+    inputRef.current?.focus()
+  }, [])
+
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSubmit()
+  }, [handleSubmit])
 
   return (
     <div className="mt-6 rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
@@ -153,7 +162,7 @@ export function AiPlanChat({
           <span>{error}</span>
           <button
             className="text-xs underline min-h-[44px] px-2"
-            onClick={() => { setError(null); inputRef.current?.focus() }}
+            onClick={handleRetry}
           >
             Retry
           </button>
@@ -167,7 +176,7 @@ export function AiPlanChat({
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+          onKeyDown={handleKeyDown}
           placeholder={isOnline ? 'e.g. "Swap incline press for barbell bench"' : 'AI unavailable offline'}
           disabled={!isOnline || loading}
           className="flex-1 min-h-[44px] px-3 rounded-xl bg-white/5 border border-[color:var(--color-border)] text-sm text-[color:var(--color-text)] placeholder:text-[color:var(--color-muted)] disabled:opacity-50"

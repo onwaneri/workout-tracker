@@ -1,14 +1,26 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
+import { generatedPlanSchema } from '../../src/lib/ai/schemas'
 
 // Simple in-memory rate limiting: max 20 requests per minute per client
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT = 20
 const RATE_WINDOW_MS = 60_000
+const MAX_RATE_LIMIT_ENTRIES = 10000
 
 function checkRateLimit(clientUuid: string): boolean {
   const now = Date.now()
   const entry = rateLimitMap.get(clientUuid)
+
+  // Prune expired entries if map is getting large (prevents memory leak)
+  if (rateLimitMap.size > MAX_RATE_LIMIT_ENTRIES) {
+    for (const [key, val] of rateLimitMap.entries()) {
+      if (now > val.resetAt) {
+        rateLimitMap.delete(key)
+      }
+    }
+  }
+
   if (!entry || now > entry.resetAt) {
     rateLimitMap.set(clientUuid, { count: 1, resetAt: now + RATE_WINDOW_MS })
     return true
@@ -93,7 +105,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const client = new Anthropic({ apiKey })
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
+      model: 'claude-sonnet-4-6', // Balanced speed/quality for plan generation
       max_tokens: 4096,
       system: [
         {
@@ -105,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       messages: [
         {
           role: 'user',
-          content: prompt.trim(),
+          content: prompt,
         },
       ],
     })
@@ -118,11 +130,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let parsed: unknown
     try {
       parsed = JSON.parse(textBlock.text)
-    } catch {
-      return res.status(502).json({ error: 'AI returned invalid JSON', raw: textBlock.text })
+    } catch (parseErr) {
+      console.error('[plan-generate] AI returned invalid JSON:', textBlock.text.slice(0, 500))
+      return res.status(502).json({ error: 'AI returned invalid JSON' })
     }
 
-    return res.status(200).json(parsed)
+    // Validate response against schema before returning
+    const validated = generatedPlanSchema.safeParse(parsed)
+    if (!validated.success) {
+      return res.status(502).json({
+        error: 'AI returned invalid plan structure',
+        details: validated.error.flatten(),
+      })
+    }
+
+    return res.status(200).json(validated.data)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return res.status(502).json({ error: `AI request failed: ${message}` })
