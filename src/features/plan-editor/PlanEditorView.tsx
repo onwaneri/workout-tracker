@@ -204,14 +204,14 @@ export function PlanEditorView() {
       {isAiFeaturesEnabled() && (
         <AiPlanChat
           draft={draft}
-          onApplyDiff={useCallback((actions: PlanEditAction[]) => {
+          onApplyDiff={(actions: PlanEditAction[]) => {
             try {
               const updated = applyAiDiff(draft, actions)
               setDraft(updated)
             } catch {
               // If diff application fails, don't crash — user can still edit manually
             }
-          }, [draft])}
+          }}
         />
       )}
     </Screen>
