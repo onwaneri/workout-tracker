@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { Button } from '@/components/Button'
 
 export type SetDraft = {
   weight: string
@@ -16,6 +15,99 @@ export type SetPrefill = {
 }
 
 const empty: SetDraft = { weight: '', reps: '', rpe: '', isWarmup: false, note: '' }
+
+const RPE_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
+
+function step(val: string, delta: number, isDecimal = false): string {
+  const n = parseFloat(val)
+  const base = isNaN(n) ? 0 : n
+  const next = Math.max(0, base + delta)
+  return isDecimal ? String(Math.round(next * 2) / 2) : String(Math.round(next))
+}
+
+function NumberField({
+  label,
+  unit,
+  value,
+  prev,
+  onChange,
+  stepSmall,
+  stepLarge,
+  isDecimal,
+}: {
+  label: string
+  unit?: string
+  value: string
+  prev?: string
+  onChange: (v: string) => void
+  stepSmall: number
+  stepLarge: number
+  isDecimal?: boolean
+}) {
+  return (
+    <div style={{
+      flex: 1,
+      background: 'var(--color-surface)',
+      border: '1px solid var(--color-border)',
+      borderRadius: 16,
+      padding: '12px 14px',
+      display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+          {label}
+        </span>
+        {prev != null && prev !== '' && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-faint)' }}>
+            prev {prev}{unit ? unit : ''}
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <input
+          inputMode={isDecimal ? 'decimal' : 'numeric'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="—"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 36,
+            fontWeight: 500,
+            color: 'var(--color-text)',
+            letterSpacing: '-0.04em',
+            fontFeatureSettings: '"tnum"',
+            background: 'transparent',
+            border: 'none',
+            outline: 'none',
+            width: '100%',
+            minWidth: 0,
+          }}
+        />
+        {unit && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)' }}>{unit}</span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+        {[-stepLarge, -stepSmall, stepSmall, stepLarge].map((d, i) => (
+          <button
+            key={i}
+            type="button"
+            onClick={() => onChange(step(value, d, isDecimal))}
+            style={{
+              flex: 1, padding: '6px 0', borderRadius: 8,
+              border: '1px solid var(--color-border)',
+              background: 'transparent', color: 'var(--color-muted)',
+              fontFamily: 'var(--font-mono)', fontSize: 11, cursor: 'pointer',
+              minHeight: 32,
+            }}
+          >
+            {d > 0 ? `+${d}` : d}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 export function SetRow({
   setNumber,
@@ -36,8 +128,6 @@ export function SetRow({
   const [showNote, setShowNote] = useState(false)
   const [useBw, setUseBw] = useState<boolean>(() => bodyweight != null)
 
-  // Seed empty inputs from prefill when it loads/changes (e.g. history fetch resolves
-  // after first render). Don't overwrite values the user has already typed.
   useEffect(() => {
     if (!prefill) return
     setD((prev) => {
@@ -55,91 +145,133 @@ export function SetRow({
       isWarmup: d.isWarmup,
       note: d.note.trim() === '' ? null : d.note.trim(),
     })
-    setD({
-      weight: bwActive ? '' : d.weight,
-      reps: d.reps,
-      rpe: d.rpe,
-      isWarmup: false,
-      note: '',
-    })
+    setD({ weight: bwActive ? '' : d.weight, reps: d.reps, rpe: d.rpe, isWarmup: false, note: '' })
     setShowNote(false)
   }
 
+  const selectedRpe = d.rpe !== '' ? Number(d.rpe) : null
+
   return (
-    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-bg)] p-3">
-      <div className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-[color:var(--color-muted)] w-8">#{setNumber}</span>
-        {bodyweight != null && (
-          <button
-            type="button"
-            onClick={() => setUseBw((v) => !v)}
-            aria-pressed={useBw}
-            className={`text-xs px-2 py-1 rounded-md border ${
-              useBw
-                ? 'bg-[color:var(--color-accent)]/15 border-[color:var(--color-accent)] text-[color:var(--color-accent)]'
-                : 'border-[color:var(--color-border)] text-[color:var(--color-muted)]'
-            }`}
-          >
-            BW
-          </button>
-        )}
-        {useBw && bodyweight != null ? (
-          <span className="flex-1 min-w-0 text-base text-[color:var(--color-muted)]">
-            BW · {bodyweight}
-          </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Number fields */}
+      <div style={{ display: 'flex', gap: 12 }}>
+        {bodyweight != null ? (
+          <div style={{ flex: 1 }}>
+            <button
+              type="button"
+              onClick={() => setUseBw((v) => !v)}
+              style={{
+                width: '100%', padding: '8px 14px', borderRadius: 10,
+                border: `1px solid ${useBw ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                background: useBw ? 'var(--color-accent-soft)' : 'transparent',
+                color: useBw ? 'var(--color-accent)' : 'var(--color-muted)',
+                fontFamily: 'var(--font-mono)', fontSize: 12, cursor: 'pointer',
+                marginBottom: 6,
+              }}
+            >
+              {useBw ? `BW · ${bodyweight} lb` : 'Use bodyweight'}
+            </button>
+            {!useBw && (
+              <NumberField label="Weight" unit="lb" value={d.weight} prev={prefill?.weight}
+                onChange={(v) => setD({ ...d, weight: v })} stepSmall={2.5} stepLarge={5} isDecimal />
+            )}
+          </div>
         ) : (
-          <input
-            inputMode="decimal"
-            placeholder="Weight"
-            value={d.weight}
-            onChange={(e) => setD({ ...d, weight: e.target.value })}
-            className="flex-1 min-w-0 bg-transparent text-base focus:outline-none"
-          />
+          <NumberField label="Weight" unit="lb" value={d.weight} prev={prefill?.weight}
+            onChange={(v) => setD({ ...d, weight: v })} stepSmall={2.5} stepLarge={5} isDecimal />
         )}
-        <span className="text-[color:var(--color-muted)] text-sm">×</span>
-        <input
-          inputMode="numeric"
-          placeholder="Reps"
-          value={d.reps}
-          onChange={(e) => setD({ ...d, reps: e.target.value })}
-          className="w-16 bg-transparent text-base focus:outline-none"
-        />
-        <input
-          inputMode="decimal"
-          placeholder="RPE"
-          value={d.rpe}
-          onChange={(e) => setD({ ...d, rpe: e.target.value })}
-          className="w-14 bg-transparent text-sm text-[color:var(--color-muted)] focus:outline-none"
-        />
+        <NumberField label="Reps" value={d.reps} prev={prefill?.reps}
+          onChange={(v) => setD({ ...d, reps: v })} stepSmall={1} stepLarge={2} />
       </div>
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <label className="flex items-center gap-2 text-xs text-[color:var(--color-muted)]">
+
+      {/* RPE pills */}
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+            RPE · how hard?
+          </div>
+          {prefill?.rpe && prefill.rpe !== '' && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)' }}>
+              last · {prefill.rpe}
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 5 }}>
+          {RPE_OPTIONS.map((v) => {
+            const sel = selectedRpe === v
+            return (
+              <button
+                key={v}
+                type="button"
+                onClick={() => setD({ ...d, rpe: sel ? '' : String(v) })}
+                style={{
+                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+                  background: sel ? 'var(--color-accent)' : 'var(--color-surface)',
+                  color: sel ? 'var(--color-accent-ink)' : 'var(--color-text)',
+                  fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
+                  cursor: 'pointer', fontFeatureSettings: '"tnum"', minHeight: 40,
+                }}
+              >
+                {v}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Warmup + note row */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', userSelect: 'none' }}>
           <input
             type="checkbox"
             checked={d.isWarmup}
             onChange={(e) => setD({ ...d, isWarmup: e.target.checked })}
+            style={{ accentColor: 'var(--color-accent)' }}
           />
           Warmup
         </label>
         <button
-          className="text-xs text-[color:var(--color-muted)] underline"
+          type="button"
           onClick={() => setShowNote((s) => !s)}
+          style={{ fontSize: 12, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
         >
           {showNote ? 'Hide note' : 'Add note'}
         </button>
-        <Button variant="primary" onClick={submit}>
-          Log set
-        </Button>
       </div>
+
       {showNote && (
         <textarea
           value={d.note}
           onChange={(e) => setD({ ...d, note: e.target.value })}
           placeholder="Note"
           rows={2}
-          className="mt-2 w-full text-sm bg-[color:var(--color-surface)] rounded-md px-2 py-1.5 focus:outline-none border border-[color:var(--color-border)]"
+          style={{
+            width: '100%', fontSize: 13, background: 'var(--color-surface)',
+            border: '1px solid var(--color-border)', borderRadius: 10,
+            padding: '10px 12px', color: 'var(--color-text)', outline: 'none',
+            fontFamily: 'var(--font-body)', boxSizing: 'border-box', resize: 'none',
+          }}
         />
       )}
+
+      {/* Log set CTA */}
+      <button
+        type="button"
+        onClick={submit}
+        style={{
+          padding: 18, borderRadius: 18, border: 'none',
+          background: 'var(--color-accent)', color: 'var(--color-accent-ink)',
+          fontFamily: 'var(--font-display)', fontSize: 17, fontWeight: 600, letterSpacing: '-0.02em',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          cursor: 'pointer', width: '100%',
+        }}
+      >
+        <span>Log set {setNumber}{d.isWarmup ? ' (warmup)' : ''}</span>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, opacity: 0.7 }}>
+          {d.weight || (useBw ? 'BW' : '?')} × {d.reps || '?'}
+          {selectedRpe != null ? ` · RPE ${selectedRpe}` : ''}
+        </span>
+      </button>
     </div>
   )
 }

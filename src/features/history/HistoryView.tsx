@@ -6,84 +6,62 @@ import { fmtDate, fmtDuration, fmtWeight } from '@/lib/format'
 import { avgRestMs, totalRestMs } from '@/lib/stats/rest'
 import { PastSessionsList } from './PastSessionsList'
 
-// Lazy-load Recharts (heavy ~100KB+) only for desktop users who will see the chart
 const ExerciseChart = lazy(() => import('./ExerciseChart').then((m) => ({ default: m.ExerciseChart })))
 
 type HistoryGroup = { id: string; name: string; ids: string[] }
-type Tab = 'exercises' | 'sessions'
+type Tab = 'sessions' | 'exercises'
 
-const TABS: Tab[] = ['exercises', 'sessions']
+const TABS: Tab[] = ['sessions', 'exercises']
+
+function ArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M13 6l6 6-6 6"/>
+    </svg>
+  )
+}
 
 export function HistoryView() {
   const allEx = useAllExercises()
   const [selectedGroup, setSelectedGroup] = useState<HistoryGroup | null>(null)
-  const [tab, setTab] = useState<Tab>('exercises')
+  const [tab, setTab] = useState<Tab>('sessions')
 
   const latestByLogicalName = useMemo(() => {
     if (!allEx.data) return []
-
-    // Memoize lineage resolution to avoid O(N²) complexity
     const lineageCache = new Map<string, string[]>()
     const getLineage = (id: string) => {
-      if (!lineageCache.has(id)) {
-        lineageCache.set(id, resolveExerciseLineage(id, allEx.data))
-      }
+      if (!lineageCache.has(id)) lineageCache.set(id, resolveExerciseLineage(id, allEx.data))
       return lineageCache.get(id)!
     }
-
-    const groupsByRoot = new Map<
-      string,
-      { id: string; name: string; ids: Set<string>; latestCreatedAt: string }
-    >()
-
+    const groupsByRoot = new Map<string, { id: string; name: string; ids: Set<string>; latestCreatedAt: string }>()
     for (const e of allEx.data) {
       const lineage = getLineage(e.id)
       const root = lineage[lineage.length - 1] ?? e.id
       const existing = groupsByRoot.get(root)
       if (!existing) {
-        groupsByRoot.set(root, {
-          id: e.id,
-          name: e.name,
-          ids: new Set(lineage),
-          latestCreatedAt: e.created_at,
-        })
+        groupsByRoot.set(root, { id: e.id, name: e.name, ids: new Set(lineage), latestCreatedAt: e.created_at })
       } else {
         for (const id of lineage) existing.ids.add(id)
         if (e.created_at > existing.latestCreatedAt) {
-          existing.id = e.id
-          existing.name = e.name
-          existing.latestCreatedAt = e.created_at
+          existing.id = e.id; existing.name = e.name; existing.latestCreatedAt = e.created_at
         }
       }
     }
-
-    const groupsByName = new Map<
-      string,
-      { id: string; name: string; ids: Set<string>; latestCreatedAt: string }
-    >()
-
+    const groupsByName = new Map<string, { id: string; name: string; ids: Set<string>; latestCreatedAt: string }>()
     for (const group of groupsByRoot.values()) {
       const key = group.name.trim().toLowerCase()
       const existing = groupsByName.get(key)
       if (!existing) {
-        groupsByName.set(key, {
-          id: group.id,
-          name: group.name,
-          ids: new Set(group.ids),
-          latestCreatedAt: group.latestCreatedAt,
-        })
+        groupsByName.set(key, { id: group.id, name: group.name, ids: new Set(group.ids), latestCreatedAt: group.latestCreatedAt })
       } else {
         for (const id of group.ids) existing.ids.add(id)
         if (group.latestCreatedAt > existing.latestCreatedAt) {
-          existing.id = group.id
-          existing.name = group.name
-          existing.latestCreatedAt = group.latestCreatedAt
+          existing.id = group.id; existing.name = group.name; existing.latestCreatedAt = group.latestCreatedAt
         }
       }
     }
-
     return Array.from(groupsByName.values())
-      .map((group) => ({ id: group.id, name: group.name, ids: Array.from(group.ids).sort() }))
+      .map((g) => ({ id: g.id, name: g.name, ids: Array.from(g.ids).sort() }))
       .sort((a, b) => a.name.localeCompare(b.name))
   }, [allEx.data])
 
@@ -92,74 +70,79 @@ export function HistoryView() {
   if (selectedGroup) {
     return (
       <Screen
-        title="History"
+        title={selectedGroup.name}
+        eyebrow="Exercise history"
         action={
           <button
             onClick={() => setSelectedGroup(null)}
-            className="text-sm text-[color:var(--color-muted)] underline"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer' }}
           >
-            Back
+            ← Back
           </button>
         }
       >
-        <div className="hidden md:block mb-4">
-          <Suspense fallback={<div className="h-64 flex items-center justify-center text-sm text-[color:var(--color-muted)]">Loading chart...</div>}>
+        <div className="hidden md:block mb-6">
+          <Suspense fallback={<div style={{ height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, color: 'var(--color-muted)' }}>Loading chart…</div>}>
             <ExerciseChart sets={hist.data ?? []} />
           </Suspense>
         </div>
+
         {hist.data && hist.data.length > 0 ? (
           <>
-            <div className="text-xs text-[color:var(--color-muted)] mb-2">
-              Avg rest {fmtDuration(avgRestMs(hist.data))} · Total rest logged {fmtDuration(totalRestMs(hist.data))}
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', marginBottom: 14 }}>
+              Avg rest {fmtDuration(avgRestMs(hist.data))} · Total rest {fmtDuration(totalRestMs(hist.data))}
             </div>
-            <table className="w-full text-sm">
-              <thead className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">
-                <tr>
-                  <th className="text-left py-2">Date</th>
-                  <th className="text-right">Weight</th>
-                  <th className="text-right">Reps</th>
-                  <th className="text-right">RPE</th>
-                  <th className="text-right">Rest</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hist.data.map((s) => (
-                  <tr key={s.id} className="border-t border-[color:var(--color-border)]">
-                    <td className="py-2">{fmtDate(s.logged_at)}</td>
-                    <td className="text-right">{fmtWeight(s.weight)}</td>
-                    <td className="text-right">{s.reps ?? '—'}</td>
-                    <td className="text-right text-[color:var(--color-muted)]">{s.rpe ?? '—'}</td>
-                    <td className="text-right text-[color:var(--color-muted)]">
-                      {s.rest_ms != null ? fmtDuration(s.rest_ms) : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div style={{ borderRadius: 16, border: '1px solid var(--color-border)', background: 'var(--color-surface)', overflow: 'hidden' }}>
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr auto auto auto auto',
+                gap: 12, padding: '10px 16px',
+                borderBottom: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)',
+              }}>
+                <span>Date</span><span>Weight</span><span>Reps</span><span>RPE</span><span>Rest</span>
+              </div>
+              {hist.data.map((s, i) => (
+                <div key={s.id} style={{
+                  display: 'grid', gridTemplateColumns: '1fr auto auto auto auto',
+                  gap: 12, padding: '12px 16px', alignItems: 'center',
+                  borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
+                  fontFamily: 'var(--font-mono)', fontSize: 13,
+                }}>
+                  <span style={{ color: 'var(--color-muted)', fontSize: 11 }}>{fmtDate(s.logged_at)}</span>
+                  <span>{fmtWeight(s.weight)}</span>
+                  <span>{s.reps ?? '—'}</span>
+                  <span style={{ color: 'var(--color-muted)' }}>{s.rpe ?? '—'}</span>
+                  <span style={{ color: 'var(--color-muted)' }}>{s.rest_ms != null ? fmtDuration(s.rest_ms) : '—'}</span>
+                </div>
+              ))}
+            </div>
           </>
         ) : (
-          <p className="text-sm text-[color:var(--color-muted)]">No sets logged yet.</p>
+          <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>No sets logged yet.</p>
         )}
       </Screen>
     )
   }
 
   return (
-    <Screen title="History">
-      <div className="mb-4 inline-flex rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-0.5">
+    <Screen title="Log" eyebrow="The receipts">
+      {/* Tab strip */}
+      <div style={{ display: 'inline-flex', borderRadius: 10, border: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: 3, marginBottom: 20, gap: 2 }}>
         {TABS.map((t) => {
           const active = tab === t
           return (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`min-h-[36px] px-3 text-xs rounded-md ${
-                active
-                  ? 'bg-[color:var(--color-accent)]/15 text-[color:var(--color-accent)]'
-                  : 'text-[color:var(--color-muted)]'
-              }`}
+              style={{
+                minHeight: 34, padding: '0 14px', borderRadius: 8, border: 'none',
+                background: active ? 'var(--color-accent)' : 'transparent',
+                color: active ? 'var(--color-accent-ink)' : 'var(--color-muted)',
+                fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
+                fontWeight: active ? 600 : 400, cursor: 'pointer',
+              }}
             >
-              {t === 'exercises' ? 'Exercises' : 'Sessions'}
+              {t === 'sessions' ? 'Sessions' : 'Exercises'}
             </button>
           )
         })}
@@ -168,20 +151,28 @@ export function HistoryView() {
       {tab === 'sessions' ? (
         <PastSessionsList />
       ) : latestByLogicalName.length === 0 ? (
-        <p className="text-sm text-[color:var(--color-muted)]">No exercises yet.</p>
+        <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>No exercises yet.</p>
       ) : (
-        <ul className="space-y-1.5">
-          {latestByLogicalName.map((e) => (
-            <li key={e.id}>
-              <button
-                onClick={() => setSelectedGroup(e)}
-                className="w-full text-left px-3 py-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] hover:bg-white/5 min-h-[52px]"
-              >
-                {e.name}
-              </button>
-            </li>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {latestByLogicalName.map((e, i) => (
+            <button
+              key={e.id}
+              onClick={() => setSelectedGroup(e)}
+              style={{
+                display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+                padding: '16px 0',
+                borderTop: i === 0 ? '1px solid var(--color-border)' : 'none',
+                borderBottom: '1px solid var(--color-border)',
+                borderLeft: 'none', borderRight: 'none',
+                background: 'transparent',
+                cursor: 'pointer', textAlign: 'left', width: '100%',
+              }}
+            >
+              <span style={{ fontWeight: 500, fontSize: 15 }}>{e.name}</span>
+              <span style={{ color: 'var(--color-muted)' }}><ArrowIcon /></span>
+            </button>
           ))}
-        </ul>
+        </div>
       )}
     </Screen>
   )

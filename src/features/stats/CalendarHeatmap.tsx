@@ -2,40 +2,6 @@ import { useMemo } from 'react'
 import type { Session } from '@/lib/supabase/database.types'
 import { workoutDaysSet, currentDayStreak, longestDayStreak } from '@/lib/stats/consistency'
 
-type MonthGrid = {
-  label: string
-  year: number
-  month: number // 0-indexed
-  // 2D array: weeks (rows) × 7 days (Mon=0 … Sun=6). null = no cell (before/after month).
-  weeks: (Date | null)[][]
-}
-
-function buildMonthGrid(year: number, month: number): MonthGrid {
-  const label = new Date(year, month, 1).toLocaleString(undefined, { month: 'short', year: 'numeric' })
-  const firstDay = new Date(year, month, 1)
-  const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-  // Monday = 0 offset
-  const startDow = (firstDay.getDay() + 6) % 7
-
-  const weeks: (Date | null)[][] = []
-  let week: (Date | null)[] = new Array(startDow).fill(null) as (Date | null)[]
-
-  for (let day = 1; day <= daysInMonth; day++) {
-    week.push(new Date(year, month, day))
-    if (week.length === 7) {
-      weeks.push(week)
-      week = []
-    }
-  }
-  if (week.length > 0) {
-    while (week.length < 7) week.push(null)
-    weeks.push(week)
-  }
-
-  return { label, year, month, weeks }
-}
-
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -45,70 +11,89 @@ export function CalendarHeatmap({ sessions }: { sessions: Session[] }) {
   const streak = useMemo(() => currentDayStreak(workoutSet), [workoutSet])
   const best = useMemo(() => longestDayStreak(workoutSet), [workoutSet])
 
-  const months = useMemo(() => {
+  // Build 13-week grid (most recent week on the right)
+  const cells = useMemo(() => {
     const today = new Date()
-    const grids: MonthGrid[] = []
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(today.getFullYear(), today.getMonth() - i, 1)
-      grids.push(buildMonthGrid(d.getFullYear(), d.getMonth()))
+    const result: { date: Date; key: string }[][] = []
+    // Sunday of 13 weeks ago
+    const startDate = new Date(today)
+    startDate.setDate(today.getDate() - today.getDay() - 13 * 7)
+
+    for (let w = 0; w < 13; w++) {
+      const week: { date: Date; key: string }[] = []
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(startDate)
+        date.setDate(startDate.getDate() + w * 7 + d)
+        week.push({ date, key: toDateKey(date) })
+      }
+      result.push(week)
     }
-    return grids // most recent first
+    return result
   }, [])
 
   const todayKey = toDateKey(new Date())
 
   return (
     <section>
-      <div className="flex items-baseline gap-4 mb-3">
+      {/* Streak chips */}
+      <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">Current streak</div>
-          <div className="text-xl font-semibold">
-            {streak} <span className="text-sm font-normal text-[color:var(--color-muted)]">days</span>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+            Streak
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 500, color: 'var(--color-accent)', marginTop: 2, fontFeatureSettings: '"tnum"' }}>
+            {streak}<span style={{ fontSize: 14, color: 'var(--color-muted)', marginLeft: 2 }}>d</span>
           </div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">Best</div>
-          <div className="text-xl font-semibold">
-            {best} <span className="text-sm font-normal text-[color:var(--color-muted)]">days</span>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+            Best
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 28, fontWeight: 500, marginTop: 2, fontFeatureSettings: '"tnum"' }}>
+            {best}<span style={{ fontSize: 14, color: 'var(--color-muted)', marginLeft: 2 }}>d</span>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] px-3 py-3 overflow-y-auto max-h-[480px]">
-        <div className="space-y-4">
-          {months.map((m) => (
-            <div key={`${m.year}-${m.month}`}>
-              <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)] mb-1">
-                {m.label}
-              </div>
-              <div className="grid grid-cols-7 gap-[3px]">
-                {m.weeks.flat().map((day, i) => {
-                  if (!day) {
-                    return <div key={i} className="aspect-square w-full" />
-                  }
-                  const key = toDateKey(day)
-                  const isToday = key === todayKey
-                  const worked = workoutSet.has(key)
-                  const isFuture = day.getTime() > Date.now()
+      {/* 13-week grid: columns = weeks, rows = days */}
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, 1fr)`, gap: 4 }}>
+        {cells.map((week, wi) => (
+          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {week.map(({ date, key }) => {
+              const worked = workoutSet.has(key)
+              const isToday = key === todayKey
+              const isFuture = date.getTime() > Date.now() + 86400000
 
-                  let cellClass = 'aspect-square w-full rounded-md'
+              return (
+                <div
+                  key={key}
+                  style={{
+                    aspectRatio: '1',
+                    borderRadius: 3,
+                    background: worked
+                      ? 'var(--color-accent)'
+                      : isToday
+                        ? 'var(--color-surface-hi)'
+                        : isFuture
+                          ? 'var(--color-surface)'
+                          : 'var(--color-surface)',
+                    opacity: worked ? 0.85 : isFuture ? 0.3 : 0.6,
+                    outline: isToday ? '1px solid var(--color-accent-dim)' : 'none',
+                  }}
+                />
+              )
+            })}
+          </div>
+        ))}
+      </div>
 
-                  if (worked) {
-                    cellClass += ' bg-[color:var(--color-accent)]'
-                  } else if (isToday) {
-                    cellClass += ' ring-2 ring-inset ring-[color:var(--color-accent)]/60 bg-white/10'
-                  } else if (isFuture) {
-                    cellClass += ' bg-white/5'
-                  } else {
-                    cellClass += ' bg-white/10'
-                  }
-
-                  return <div key={i} className={cellClass} />
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
+      {/* Legend */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)', alignItems: 'center' }}>
+        <span>less</span>
+        {[0.15, 0.4, 0.65, 0.85].map((o, i) => (
+          <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-accent)', opacity: o }} />
+        ))}
+        <span>more</span>
       </div>
     </section>
   )

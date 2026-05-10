@@ -8,11 +8,20 @@ const formatMMSS = (seconds: number): string => {
   return `${m}:${sec.toString().padStart(2, '0')}`
 }
 
-export function RestTimerBanner({ timer, onSkip }: { timer: RestTimer; onSkip: () => void }) {
+const R = 110
+const CIRCUMFERENCE = 2 * Math.PI * R
+
+export function RestTimerBanner({
+  timer,
+  onSkip,
+  onAddTime,
+}: {
+  timer: RestTimer
+  onSkip: () => void
+  onAddTime: (extraSeconds: number) => void
+}) {
   const [now, setNow] = useState(() => Date.now())
 
-  // Update every second for MM:SS display — no need for sub-second precision.
-  // Empty deps: one interval for component lifetime, updates based on current timer state.
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
@@ -23,31 +32,133 @@ export function RestTimerBanner({ timer, onSkip }: { timer: RestTimer; onSkip: (
   const remainingMs = targetMs - elapsedMs
   const remainingSeconds = remainingMs / 1000
   const expired = remainingMs <= 0
-  const pct = Math.min(100, Math.max(0, (elapsedMs / targetMs) * 100))
+  const pct = Math.min(1, Math.max(0, elapsedMs / targetMs))
+  const dashOffset = CIRCUMFERENCE * (1 - pct)
 
   return (
     <div
       role="status"
       aria-live="polite"
-      className="fixed inset-x-0 bottom-0 z-30 border-t border-[color:var(--color-border)] bg-[color:var(--color-surface)]/95 backdrop-blur"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 32,
+        backdropFilter: 'blur(12px)',
+        WebkitBackdropFilter: 'blur(12px)',
+        background: 'rgba(13, 12, 10, 0.82)',
+      }}
     >
-      <div
-        className="h-1 bg-[color:var(--color-accent)] transition-[width] duration-300 ease-linear"
-        style={{ width: `${pct}%` }}
-      />
-      <div className="flex items-center justify-between gap-3 px-4 py-3 max-w-screen-sm mx-auto">
-        <div className="min-w-0">
-          <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">
+      {/* SVG ring */}
+      <div style={{ position: 'relative', width: 264, height: 264, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <svg
+          width={264}
+          height={264}
+          viewBox="0 0 264 264"
+          style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}
+        >
+          {/* Track */}
+          <circle
+            cx={132}
+            cy={132}
+            r={R}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth={6}
+          />
+          {/* Progress arc */}
+          <circle
+            cx={132}
+            cy={132}
+            r={R}
+            fill="none"
+            stroke={expired ? 'var(--color-accent)' : 'var(--color-accent)'}
+            strokeWidth={6}
+            strokeLinecap="round"
+            strokeDasharray={CIRCUMFERENCE}
+            strokeDashoffset={dashOffset}
+            style={{ transition: 'stroke-dashoffset 1s linear' }}
+          />
+        </svg>
+
+        {/* Center content */}
+        <div style={{ textAlign: 'center' }}>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 52,
+              fontWeight: 600,
+              letterSpacing: '-0.04em',
+              fontFeatureSettings: '"tnum"',
+              color: expired ? 'var(--color-accent)' : 'var(--color-text)',
+              lineHeight: 1,
+            }}
+          >
+            {expired ? '0:00' : formatMMSS(remainingSeconds)}
+          </div>
+          <div
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              letterSpacing: '0.12em',
+              textTransform: 'uppercase',
+              color: 'var(--color-muted)',
+              marginTop: 6,
+            }}
+          >
             {expired ? 'Rest done' : 'Resting'}
           </div>
-          <div className="text-sm truncate">{timer.exerciseName}</div>
         </div>
-        <div className={`text-2xl font-mono tabular-nums ${expired ? 'text-[color:var(--color-accent)]' : ''}`}>
-          {expired ? '0:00' : formatMMSS(remainingSeconds)}
+      </div>
+
+      {/* Exercise label */}
+      <div style={{ textAlign: 'center', maxWidth: 240 }}>
+        <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 600, color: 'var(--color-text)', letterSpacing: '-0.02em' }}>
+          {timer.exerciseName}
         </div>
+      </div>
+
+      {/* Action buttons */}
+      <div style={{ display: 'flex', gap: 10 }}>
         <button
+          type="button"
+          onClick={() => onAddTime(30)}
+          style={{
+            minHeight: 48,
+            padding: '0 22px',
+            borderRadius: 24,
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface-hi)',
+            color: 'var(--color-text)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            letterSpacing: '-0.01em',
+          }}
+        >
+          +30s
+        </button>
+        <button
+          type="button"
           onClick={onSkip}
-          className="min-h-[44px] px-4 rounded-lg border border-[color:var(--color-border)] text-sm font-medium hover:bg-white/5"
+          style={{
+            minHeight: 48,
+            padding: '0 22px',
+            borderRadius: 24,
+            border: '1px solid var(--color-border)',
+            background: 'var(--color-surface-hi)',
+            color: 'var(--color-muted)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 13,
+            fontWeight: 500,
+            cursor: 'pointer',
+            letterSpacing: '-0.01em',
+          }}
         >
           {expired ? 'Dismiss' : 'Skip rest'}
         </button>

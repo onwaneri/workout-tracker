@@ -24,7 +24,6 @@ export function StatsView() {
   const weekStart = useMemo(() => startOfISOWeek(new Date()), [])
   const weekStartISO = weekStart.toISOString()
 
-  // Fetch this week's session_sets for muscle-group volume.
   const weekSets = useQuery({
     queryKey: ['week-sets', weekStartISO],
     queryFn: async () => {
@@ -39,8 +38,8 @@ export function StatsView() {
 
   if (!days.data || !sessions.data || !allEx.data) {
     return (
-      <Screen title="Stats">
-        <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
+      <Screen title="Stats" eyebrow="The shape of work">
+        <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>Loading…</p>
       </Screen>
     )
   }
@@ -51,82 +50,98 @@ export function StatsView() {
   const weekVolume = weekSets.data ? volumeByMuscleGroup(weekSets.data, allEx.data) : new Map<string, number>()
   const weekAvgRest = weekSets.data ? avgRestMs(weekSets.data) : 0
   const volumeGoals = (goals.data ?? []).filter((g) => g.muscle_group && g.weekly_volume_target)
+  const totalWeekVol = Array.from(weekVolume.values()).reduce((a, v) => a + v, 0)
 
   return (
-    <Screen title="Stats">
-      <div className="mb-5">
+    <Screen title="Stats" eyebrow="The shape of work">
+
+      {/* 13-week heatmap */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 12 }}>
+          Last 13 weeks
+        </div>
         <CalendarHeatmap sessions={sessions.data} />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Stat label="This week" value={`${completedThisWeek}/${plannedPerWeek}`} />
-        <Stat label="Streak" value={`${streak}w`} />
-        <Stat label="Avg rest" value={weekAvgRest > 0 ? fmtDuration(weekAvgRest) : '—'} />
+      {/* Stat chips */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 0,
+        padding: '18px 0', borderTop: '1px solid var(--color-border)', borderBottom: '1px solid var(--color-border)',
+        marginBottom: 28,
+      }}>
+        <StatChip
+          label="This week"
+          value={`${completedThisWeek}/${plannedPerWeek}`}
+        />
+        <StatChip
+          label="Streak"
+          value={`${streak}w`}
+        />
+        <StatChip
+          label="Avg rest"
+          value={weekAvgRest > 0 ? fmtDuration(weekAvgRest) : '—'}
+        />
       </div>
 
-      <Section title="Weekly volume">
-        {weekVolume.size === 0 ? (
-          <Empty>No working sets logged yet this week.</Empty>
-        ) : (
-          <ul className="space-y-2">
+      {/* Volume by muscle */}
+      {weekVolume.size > 0 && (
+        <div style={{ marginBottom: 28 }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 12 }}>
+            Volume this week · {fmtVolume(totalWeekVol)} lb
+          </div>
+          <div style={{ borderRadius: 16, border: '1px solid var(--color-border)', background: 'var(--color-surface)', overflow: 'hidden' }}>
             {Array.from(weekVolume.entries())
               .sort((a, b) => b[1] - a[1])
-              .map(([m, v]) => {
+              .map(([m, v], i) => {
                 const goal = volumeGoals.find((g) => g.muscle_group === m)
                 const target = goal?.weekly_volume_target ?? 0
                 const pct = target > 0 ? Math.min(100, (v / target) * 100) : 0
                 return (
-                  <li key={m}>
-                    <div className="flex justify-between text-sm">
-                      <span>{m}</span>
-                      <span className="text-[color:var(--color-muted)]">
-                        {fmtVolume(v)}
-                        {target > 0 ? ` / ${fmtVolume(target)} lb` : ' lb'}
+                  <div key={m} style={{
+                    padding: '14px 18px',
+                    borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: target > 0 ? 8 : 0 }}>
+                      <span style={{ fontSize: 14, fontWeight: 500 }}>{m}</span>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', fontFeatureSettings: '"tnum"' }}>
+                        {fmtVolume(v)}{target > 0 ? ` / ${fmtVolume(target)} lb` : ' lb'}
                       </span>
                     </div>
                     {target > 0 && (
-                      <div className="mt-1 h-1.5 rounded-full bg-[color:var(--color-border)] overflow-hidden">
-                        <div
-                          className="h-full bg-[color:var(--color-accent)]"
-                          style={{ width: `${pct}%` }}
-                        />
+                      <div style={{ height: 3, borderRadius: 999, background: 'var(--color-border)', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', background: 'var(--color-accent)', width: `${pct}%`, borderRadius: 999 }} />
                       </div>
                     )}
-                  </li>
+                  </div>
                 )
               })}
-          </ul>
-        )}
-      </Section>
+          </div>
+        </div>
+      )}
 
-      <Section title="Goals">
-        <GoalsEditor />
-      </Section>
+      {/* Goals */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 12 }}>
+          Goals
+        </div>
+        <div style={{ borderRadius: 16, border: '1px solid var(--color-border)', background: 'var(--color-surface)', padding: 18 }}>
+          <GoalsEditor />
+        </div>
+      </div>
+
     </Screen>
   )
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function StatChip({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3">
-      <div className="text-[10px] uppercase tracking-wide text-[color:var(--color-muted)]">{label}</div>
-      <div className="mt-1 text-xl font-semibold">{value}</div>
+    <div style={{ paddingLeft: 0 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 26, fontWeight: 500, marginTop: 4, fontFeatureSettings: '"tnum"' }}>
+        {value}
+      </div>
     </div>
   )
 }
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-5">
-      <h2 className="text-xs uppercase tracking-wide text-[color:var(--color-muted)] mb-2">{title}</h2>
-      <div className="rounded-xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-3">
-        {children}
-      </div>
-    </section>
-  )
-}
-
-function Empty({ children }: { children: React.ReactNode }) {
-  return <div className="text-sm text-[color:var(--color-muted)]">{children}</div>
-}
-

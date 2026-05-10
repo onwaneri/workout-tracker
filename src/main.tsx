@@ -2,6 +2,9 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initTheme } from '@/lib/theme'
+
+initTheme()
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { registerSW } from 'virtual:pwa-register'
 import { setupQueueDrainTriggers } from '@/lib/offline/queue'

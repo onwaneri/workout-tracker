@@ -1,4 +1,3 @@
-import { Button } from '@/components/Button'
 import type { EditedDay, EditedExercise } from './snapshotPlan'
 
 export function DayEditor({
@@ -23,7 +22,7 @@ export function DayEditor({
       name: 'New exercise',
       muscle_group: '',
       type: 'isolation',
-      default_sets: 2,
+      default_sets: 3,
     }
     update({ exercises: [...day.exercises, next] })
   }
@@ -33,9 +32,7 @@ export function DayEditor({
   }
 
   const removeExercise = (idx: number) => {
-    update({
-      exercises: day.exercises.filter((_, i) => i !== idx),
-    })
+    update({ exercises: day.exercises.filter((_, i) => i !== idx) })
   }
 
   const moveExercise = (from: number, to: number) => {
@@ -46,95 +43,165 @@ export function DayEditor({
     update({ exercises: exs })
   }
 
+  const inputBase: React.CSSProperties = {
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    color: 'var(--color-text)',
+    fontFamily: 'var(--font-body)',
+    fontSize: 14,
+    minWidth: 0,
+  }
+
   return (
-    <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-4">
-      <header className="flex items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Day {dayNumber}</span>
+    <div style={{
+      borderRadius: 16,
+      border: '1px solid var(--color-border)',
+      background: 'var(--color-surface)',
+      overflow: 'hidden',
+    }}>
+      {/* Day header */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '14px 16px',
+        borderBottom: '1px solid var(--color-border)',
+      }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)', flexShrink: 0 }}>
+          D{dayNumber}
+        </span>
         <input
           value={day.name}
           onChange={(e) => update({ name: e.target.value })}
-          className="flex-1 bg-transparent border-b border-[color:var(--color-border)] focus:outline-none focus:border-[color:var(--color-accent)] px-1 py-1 text-base font-medium"
+          style={{ ...inputBase, flex: 1, fontWeight: 600, fontSize: 15 }}
         />
-        <label className="flex items-center gap-2 text-xs text-[color:var(--color-muted)]">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--color-muted)', cursor: 'pointer', userSelect: 'none', flexShrink: 0 }}>
           <input
             type="checkbox"
             checked={day.is_rest}
             onChange={(e) => update({ is_rest: e.target.checked })}
+            style={{ accentColor: 'var(--color-accent)' }}
           />
           Rest
         </label>
-        <button onClick={onMoveUp} className="min-h-[44px] min-w-[36px] text-[color:var(--color-muted)]" aria-label="Move day up">↑</button>
-        <button onClick={onMoveDown} className="min-h-[44px] min-w-[36px] text-[color:var(--color-muted)]" aria-label="Move day down">↓</button>
+        <button onClick={onMoveUp} aria-label="Move day up" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↑</button>
+        <button onClick={onMoveDown} aria-label="Move day down" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↓</button>
         {onRemove && (
-          <button onClick={onRemove} className="min-h-[44px] min-w-[36px] text-red-300" aria-label="Remove day">×</button>
+          <button onClick={onRemove} aria-label="Remove day" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 18 }}>×</button>
         )}
-      </header>
+      </div>
 
+      {/* Exercise list */}
       {!day.is_rest && (
         <>
-          <ul className="mt-3 space-y-2">
-            {day.exercises.map((e, i) => (
-              <li
-                key={i}
-                className="flex items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] px-2 py-2"
-              >
-                <input
-                  value={e.name}
-                  onChange={(ev) => updateExercise(i, { name: ev.target.value })}
-                  className="flex-1 min-w-0 bg-transparent text-sm focus:outline-none"
-                />
-                <input
-                  value={e.muscle_group}
-                  onChange={(ev) => updateExercise(i, { muscle_group: ev.target.value })}
-                  placeholder="Muscle"
-                  className="w-24 bg-transparent text-xs text-[color:var(--color-muted)] focus:outline-none"
-                />
-                <select
-                  value={e.type}
-                  onChange={(ev) => updateExercise(i, { type: ev.target.value as 'compound' | 'isolation' })}
-                  className="bg-transparent text-xs"
-                >
-                  <option value="compound">Compound</option>
-                  <option value="isolation">Isolation</option>
-                </select>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  value={e.default_sets}
-                  onChange={(ev) =>
-                    updateExercise(i, { default_sets: Math.max(1, Number(ev.target.value) || 1) })
-                  }
-                  className="w-12 bg-transparent text-xs text-center"
-                  aria-label="Default sets"
-                />
-                <button
-                  onClick={() => moveExercise(i, i - 1)}
-                  className="text-[color:var(--color-muted)] min-h-[44px] w-7"
-                  aria-label="Move exercise up"
-                >
-                  ↑
-                </button>
-                <button
-                  onClick={() => moveExercise(i, i + 1)}
-                  className="text-[color:var(--color-muted)] min-h-[44px] w-7"
-                  aria-label="Move exercise down"
-                >
-                  ↓
-                </button>
-                <button
-                  onClick={() => removeExercise(i)}
-                  className="text-red-300 min-h-[44px] w-7"
-                  aria-label="Remove exercise"
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-          </ul>
+          {day.exercises.length > 0 && (
+            <div>
+              {/* Column headers */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '24px 1fr 80px 90px 48px 72px',
+                gap: 8,
+                padding: '8px 16px',
+                borderBottom: '1px solid var(--color-border)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color: 'var(--color-muted)',
+              }}>
+                <span>#</span>
+                <span>Exercise</span>
+                <span>Muscle</span>
+                <span>Type</span>
+                <span style={{ textAlign: 'center' }}>Sets</span>
+                <span />
+              </div>
 
-          <div className="mt-3 flex items-center justify-between gap-2">
-            <Button variant="secondary" onClick={addExercise}>+ Add exercise</Button>
-          </div>
+              {day.exercises.map((e, i) => (
+                <div
+                  key={i}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '24px 1fr 80px 90px 48px 72px',
+                    gap: 8,
+                    padding: '10px 16px',
+                    alignItems: 'center',
+                    borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
+                  }}
+                >
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', fontFeatureSettings: '"tnum"' }}>
+                    {i + 1}
+                  </span>
+                  <input
+                    value={e.name}
+                    onChange={(ev) => updateExercise(i, { name: ev.target.value })}
+                    style={{ ...inputBase, fontWeight: 500 }}
+                  />
+                  <input
+                    value={e.muscle_group}
+                    onChange={(ev) => updateExercise(i, { muscle_group: ev.target.value })}
+                    placeholder="Group"
+                    style={{ ...inputBase, fontSize: 12, color: 'var(--color-muted)' }}
+                  />
+                  <select
+                    value={e.type}
+                    onChange={(ev) => updateExercise(i, { type: ev.target.value as 'compound' | 'isolation' })}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      outline: 'none',
+                      color: 'var(--color-muted)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      minWidth: 0,
+                    }}
+                  >
+                    <option value="compound">Compound</option>
+                    <option value="isolation">Isolation</option>
+                  </select>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    value={e.default_sets}
+                    onChange={(ev) => updateExercise(i, { default_sets: Math.max(1, Number(ev.target.value) || 1) })}
+                    aria-label="Default sets"
+                    style={{ ...inputBase, width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontFeatureSettings: '"tnum"' }}
+                  />
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 0 }}>
+                    <button onClick={() => moveExercise(i, i - 1)} aria-label="Move up" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↑</button>
+                    <button onClick={() => moveExercise(i, i + 1)} aria-label="Move down" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↓</button>
+                    <button onClick={() => removeExercise(i)} aria-label="Remove" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 16 }}>×</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Add exercise row */}
+          <button
+            type="button"
+            onClick={addExercise}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              width: '100%',
+              padding: '12px 16px',
+              background: 'none',
+              border: 'none',
+              borderTop: '1px dashed var(--color-border)',
+              color: 'var(--color-muted)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 12,
+              letterSpacing: '0.04em',
+              cursor: 'pointer',
+              textAlign: 'left',
+            }}
+          >
+            + Add exercise
+          </button>
         </>
       )}
     </div>

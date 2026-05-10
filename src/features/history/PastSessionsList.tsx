@@ -4,6 +4,14 @@ import { useAllWorkoutDays } from '@/lib/queries/plans'
 import { fmtDate, fmtDuration } from '@/lib/format'
 import { SessionDetail } from './SessionDetail'
 
+function ArrowIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14M13 6l6 6-6 6"/>
+    </svg>
+  )
+}
+
 export function PastSessionsList() {
   const sessions = useSessions()
   const days = useAllWorkoutDays()
@@ -16,11 +24,12 @@ export function PastSessionsList() {
     return m
   }, [days.data])
 
-  // Memoize session list items with computed durations to avoid recalculating on every render
   const sessionItems = useMemo(() => {
     return (sessions.data ?? []).map((s) => {
       const durationMs =
-        s.ended_at && s.started_at ? new Date(s.ended_at).getTime() - new Date(s.started_at).getTime() : null
+        s.ended_at && s.started_at
+          ? new Date(s.ended_at).getTime() - new Date(s.started_at).getTime()
+          : null
       return { ...s, durationMs }
     })
   }, [sessions.data])
@@ -37,11 +46,11 @@ export function PastSessionsList() {
   const handleBack = useCallback(() => setSelectedId(null), [])
 
   if (sessions.isLoading) {
-    return <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
+    return <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>Loading…</p>
   }
 
   if (sessionItems.length === 0) {
-    return <p className="text-sm text-[color:var(--color-muted)]">No sessions yet.</p>
+    return <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>No sessions yet.</p>
   }
 
   if (selectedId) {
@@ -51,35 +60,73 @@ export function PastSessionsList() {
   }
 
   return (
-    <ul className="space-y-2">
-      {sessionItems.map((s) => {
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {sessionItems.map((s, i) => {
         const name = dayNameById.get(s.workout_day_id) ?? 'Workout'
         const inProgress = !s.ended_at
         const label = `${name} · ${fmtDate(s.started_at)}`
+        const startDate = new Date(s.started_at)
+        const dayNum = startDate.getDate()
+        const monthAbbr = startDate.toLocaleString('en-US', { month: 'short' })
+
         return (
-          <li
+          <div
             key={s.id}
             onClick={() => setSelectedId(s.id)}
-            className="flex items-center justify-between gap-3 px-3 py-3 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-surface)] cursor-pointer active:bg-white/5"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '52px 1fr auto',
+              gap: 14,
+              padding: '14px 0',
+              borderTop: i === 0 ? '1px solid var(--color-border)' : 'none',
+              borderBottom: '1px solid var(--color-border)',
+              alignItems: 'center',
+              cursor: 'pointer',
+            }}
           >
-            <div className="min-w-0">
-              <div className="text-sm font-medium truncate">{name}</div>
-              <div className="text-xs text-[color:var(--color-muted)]">
-                {fmtDate(s.started_at)}
-                {s.durationMs != null && <> · {fmtDuration(s.durationMs)}</>}
-                {inProgress && <> · in progress</>}
+            {/* Date block */}
+            <div style={{ textAlign: 'center', fontFamily: 'var(--font-mono)' }}>
+              <div style={{ fontSize: 22, fontWeight: 500, lineHeight: 1, fontFeatureSettings: '"tnum"' }}>
+                {dayNum}
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--color-muted)', textTransform: 'uppercase', marginTop: 2 }}>
+                {monthAbbr}
               </div>
             </div>
-            <button
-              onClick={(e) => onDelete(e, s.id, label)}
-              disabled={cancel.isPending}
-              className="text-xs text-red-300 underline min-h-[44px] px-2 disabled:opacity-50"
-            >
-              Delete
-            </button>
-          </li>
+
+            {/* Name + meta */}
+            <div>
+              <div style={{ fontWeight: 500, fontSize: 14 }}>
+                {name}
+                {inProgress && (
+                  <span style={{ marginLeft: 8, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-accent)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    ● Live
+                  </span>
+                )}
+              </div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', marginTop: 3 }}>
+                {s.durationMs != null ? fmtDuration(s.durationMs) : fmtDate(s.started_at)}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <button
+                onClick={(e) => onDelete(e, s.id, label)}
+                disabled={cancel.isPending}
+                style={{
+                  fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--color-danger)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px',
+                  minHeight: 44, display: 'flex', alignItems: 'center',
+                }}
+              >
+                Del
+              </button>
+              <span style={{ color: 'var(--color-muted)' }}><ArrowIcon /></span>
+            </div>
+          </div>
         )
       })}
-    </ul>
+    </div>
   )
 }

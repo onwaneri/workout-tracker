@@ -15,6 +15,21 @@ import { CycleStrip } from './CycleStrip'
 import { PickAnotherView } from './PickAnotherView'
 import type { WorkoutDay } from '@/lib/supabase/database.types'
 
+function PlayIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 4l13 8-13 8V4Z"/>
+    </svg>
+  )
+}
+
+function todayEyebrow() {
+  const now = new Date()
+  const day = now.toLocaleDateString('en-US', { weekday: 'long' })
+  const md = now.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+  return `${day} · ${md}`
+}
+
 export function TodayView() {
   const seed = useEnsurePlan()
   const pv = useActivePlanVersion()
@@ -60,7 +75,6 @@ export function TodayView() {
   const [showPicker, setShowPicker] = useState(false)
   const [pickerBusyDayId, setPickerBusyDayId] = useState<string | null>(null)
 
-  // Stabilize callbacks to prevent child re-renders.
   const handleSelectDay = useCallback((offset: number, day: WorkoutDay) => {
     setSelectedDayId(offset === 0 ? null : day.id)
   }, [])
@@ -95,17 +109,17 @@ export function TodayView() {
 
   if (seed.status === 'seeding' || seed.status === 'idle') {
     return (
-      <Screen title="Today">
-        <p className="text-sm text-[color:var(--color-muted)]">Setting up your plan…</p>
+      <Screen title="Setting up…" eyebrow={todayEyebrow()}>
+        <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>Initializing your plan…</p>
       </Screen>
     )
   }
   if (seed.status === 'error') {
     return (
-      <Screen title="Today">
-        <p className="text-sm text-red-300">Could not initialize plan: {seed.error}</p>
-        <p className="text-xs mt-3 text-[color:var(--color-muted)]">
-          Make sure the database migrations in <code>supabase/migrations/</code> have been applied to your Supabase project.
+      <Screen title="Error" eyebrow={todayEyebrow()}>
+        <p style={{ fontSize: 14, color: 'var(--color-danger)' }}>Could not initialize plan: {seed.error}</p>
+        <p style={{ fontSize: 12, marginTop: 12, color: 'var(--color-muted)' }}>
+          Make sure the database migrations in <code>supabase/migrations/</code> have been applied.
         </p>
       </Screen>
     )
@@ -154,8 +168,8 @@ export function TodayView() {
 
   if (!nextDay || !activeDay || !pv.data) {
     return (
-      <Screen title="Today">
-        <p className="text-sm text-[color:var(--color-muted)]">Loading…</p>
+      <Screen title="Loading…" eyebrow={todayEyebrow()}>
+        <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>Loading…</p>
       </Screen>
     )
   }
@@ -164,9 +178,17 @@ export function TodayView() {
   const estimatedMs = exs.reduce((acc, e) => acc + e.default_sets * restTargetSeconds(e.type) * 1000, 0)
   const isOffNext = activeDay.id !== nextDay.id
 
+  const screenTitle = isRestDay && !isOffNext
+    ? 'Rest day.'
+    : doneForToday && !isOffNext
+    ? 'All done.'
+    : isOffNext
+    ? activeDay.name
+    : activeDay.name.split('·')[0].trim().toLowerCase() + '.'
+
   return (
-    <Screen title="Today">
-      <div className="mb-4">
+    <Screen title={screenTitle} eyebrow={todayEyebrow()}>
+      <div className="mb-5">
         <CycleStrip
           workoutDays={workoutDays}
           nextDayId={nextDay.id}
@@ -176,38 +198,46 @@ export function TodayView() {
         {isOffNext && (
           <button
             onClick={() => setSelectedDayId(null)}
-            className="mt-2 text-xs text-[color:var(--color-muted)] underline"
+            style={{ marginTop: 8, fontSize: 12, color: 'var(--color-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-mono)', textDecoration: 'underline' }}
           >
-            Back to next
+            ← Back to next
           </button>
         )}
       </div>
 
-      <div className="rounded-2xl border border-[color:var(--color-border)] bg-[color:var(--color-surface)] p-5">
+      {/* Hero card */}
+      <div style={{
+        borderRadius: 22,
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
+        padding: '22px 22px 20px',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Accent glow */}
+        <div style={{
+          position: 'absolute', right: -20, top: -20, width: 140, height: 140, borderRadius: '50%',
+          background: 'radial-gradient(circle at 30% 30%, var(--color-accent-soft), transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+
         {isRestDay && !isOffNext ? (
           <>
-            <div className="text-xs uppercase tracking-wide text-blue-400">Rest day</div>
-            <div className="mt-2 text-sm text-[color:var(--color-muted)]">
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+              Rest day
+            </div>
+            <div style={{ marginTop: 8, fontSize: 14, color: 'var(--color-muted)' }}>
               Take it easy — recovery is part of the program.
             </div>
-            <div className="mt-4 border-t border-[color:var(--color-border)] pt-4">
-              <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Up next</div>
-              <div className="mt-1 text-lg font-semibold">{activeDay.name}</div>
-              <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Up next</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 6 }}>{activeDay.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
                 ~{fmtDuration(estimatedMs)} · {exs.length} exercises
               </div>
-              <ul className="mt-3 space-y-1 text-sm">
-                {exs.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
-                    <span>{e.name}</span>
-                    <span className="text-xs text-[color:var(--color-muted)]">
-                      {e.default_sets}× · {e.type}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ExerciseList exs={exs} />
             </div>
-            <div className="mt-5">
+            <div style={{ marginTop: 20 }}>
               <Button size="lg" variant="secondary" className="w-full" onClick={handleStart} disabled={startSession.isPending}>
                 {startSession.isPending ? 'Starting…' : 'Work out anyway'}
               </Button>
@@ -215,28 +245,21 @@ export function TodayView() {
           </>
         ) : doneForToday && !isOffNext ? (
           <>
-            <div className="text-xs uppercase tracking-wide text-green-400">Done for today</div>
-            <div className="mt-2 text-sm text-[color:var(--color-muted)]">
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-success)' }}>
+              Done for today
+            </div>
+            <div style={{ marginTop: 8, fontSize: 14, color: 'var(--color-muted)' }}>
               Nice work. Rest up and come back tomorrow.
             </div>
-            <div className="mt-4 border-t border-[color:var(--color-border)] pt-4">
-              <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Up next</div>
-              <div className="mt-1 text-lg font-semibold">{activeDay.name}</div>
-              <div className="mt-1 text-xs text-[color:var(--color-muted)]">
+            <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid var(--color-border)' }}>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>Up next</div>
+              <div style={{ fontFamily: 'var(--font-display)', fontSize: 20, fontWeight: 600, letterSpacing: '-0.02em', marginTop: 6 }}>{activeDay.name}</div>
+              <div style={{ fontSize: 12, color: 'var(--color-muted)', marginTop: 4, fontFamily: 'var(--font-mono)' }}>
                 ~{fmtDuration(estimatedMs)} · {exs.length} exercises
               </div>
-              <ul className="mt-3 space-y-1 text-sm">
-                {exs.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
-                    <span>{e.name}</span>
-                    <span className="text-xs text-[color:var(--color-muted)]">
-                      {e.default_sets}× · {e.type}
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <ExerciseList exs={exs} />
             </div>
-            <div className="mt-5">
+            <div style={{ marginTop: 20 }}>
               <Button size="lg" variant="secondary" className="w-full" onClick={handleStart} disabled={startSession.isPending}>
                 {startSession.isPending ? 'Starting…' : 'Start anyway'}
               </Button>
@@ -244,37 +267,105 @@ export function TodayView() {
           </>
         ) : (
           <>
-            <div className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">
-              {isOffNext ? 'Picked workout' : 'Next session'}
+            {/* Header row with play button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
+                  {isOffNext ? 'Picked workout' : 'Up next'}
+                </div>
+                <div style={{ fontFamily: 'var(--font-display)', fontSize: 24, fontWeight: 600, letterSpacing: '-0.03em', marginTop: 8, lineHeight: 1.1 }}>
+                  {activeDay.name.includes(' · ')
+                    ? <>
+                        {activeDay.name.split(' · ')[0]}<br />
+                        <span style={{ opacity: 0.7, fontSize: 18 }}>{activeDay.name.split(' · ')[1]}</span>
+                      </>
+                    : activeDay.name}
+                </div>
+              </div>
+              <button
+                onClick={handleStart}
+                disabled={startSession.isPending}
+                style={{
+                  width: 52, height: 52, borderRadius: 16, border: 'none',
+                  background: 'var(--color-accent)', color: 'var(--color-accent-ink)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer', flexShrink: 0,
+                  opacity: startSession.isPending ? 0.5 : 1,
+                }}
+                aria-label="Start session"
+              >
+                <PlayIcon />
+              </button>
             </div>
-            <div className="mt-1 text-xl font-semibold">{activeDay.name}</div>
-            <div className="mt-1 text-xs text-[color:var(--color-muted)]">
-              ~{fmtDuration(estimatedMs)} · {exs.length} exercises
+
+            {/* Stats strip */}
+            <div style={{ display: 'flex', gap: 22, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--color-border)' }}>
+              <MiniStat label="Time" value={`~${fmtDuration(estimatedMs)}`} />
+              <MiniStat label="Sets" value={String(exs.reduce((a, e) => a + e.default_sets, 0))} />
+              <MiniStat label="Exercises" value={String(exs.length)} />
             </div>
-            <ul className="mt-4 space-y-1 text-sm">
-              {exs.map((e) => (
-                <li key={e.id} className="flex items-center justify-between text-[color:var(--color-text)]/90">
-                  <span>{e.name}</span>
-                  <span className="text-xs text-[color:var(--color-muted)]">
-                    {e.default_sets}× · {e.type}
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-5">
-              <Button size="lg" variant="primary" className="w-full" onClick={handleStart} disabled={startSession.isPending}>
-                {startSession.isPending ? 'Starting…' : 'Start session'}
-              </Button>
-            </div>
+
+            {/* Exercise list */}
+            {exs.length > 0 && (
+              <div style={{ marginTop: 20 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 10 }}>
+                  The plan
+                </div>
+                <ExerciseList exs={exs} numbered />
+              </div>
+            )}
           </>
         )}
       </div>
 
       {sessions.data && sessions.data.length > 0 && (
-        <div className="mt-5 text-xs text-[color:var(--color-muted)]">
-          Last session: {new Date(sessions.data[0].started_at).toLocaleString()}
+        <div style={{ marginTop: 16, fontSize: 11, color: 'var(--color-faint)', fontFamily: 'var(--font-mono)' }}>
+          last session · {new Date(sessions.data[0].started_at).toLocaleString()}
         </div>
       )}
     </Screen>
+  )
+}
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+function MiniStat({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
+        {label}
+      </div>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 500, color: 'var(--color-text)', marginTop: 2, fontFeatureSettings: '"tnum"' }}>
+        {value}
+      </div>
+    </div>
+  )
+}
+
+function ExerciseList({ exs, numbered }: { exs: { id: string; name: string; default_sets: number; type: string }[]; numbered?: boolean }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {exs.map((e, i) => (
+        <div key={e.id} style={{
+          display: 'grid',
+          gridTemplateColumns: numbered ? '28px 1fr auto' : '1fr auto',
+          gap: 12,
+          alignItems: 'center',
+          paddingTop: 12,
+          paddingBottom: 12,
+          borderTop: `1px solid var(--color-border)`,
+        }}>
+          {numbered && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-faint)', fontFeatureSettings: '"tnum"' }}>
+              {String(i + 1).padStart(2, '0')}
+            </div>
+          )}
+          <div style={{ fontWeight: 500, fontSize: 14 }}>{e.name}</div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--color-muted)', fontFeatureSettings: '"tnum"' }}>
+            {e.default_sets}× · {e.type}
+          </div>
+        </div>
+      ))}
+    </div>
   )
 }

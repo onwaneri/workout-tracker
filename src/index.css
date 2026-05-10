@@ -1,14 +1,93 @@
 @import "tailwindcss";
 
-@theme {
-  --color-bg: #0b0d10;
-  --color-surface: #14171c;
-  --color-border: #222730;
-  --color-text: #e6e8eb;
-  --color-muted: #8a919c;
-  --color-accent: #8b5cf6;
+/* ── Font families ──────────────────────────────────────────────────────── */
+:root {
+  --font-display: "Bricolage Grotesque", "Geist", system-ui, sans-serif;
+  --font-body: "Geist", "Inter Tight", system-ui, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
 }
 
+/* ── Base dark tokens (default) ─────────────────────────────────────────── */
+:root {
+  --color-bg: #0d0c0a;
+  --color-surface: #16140f;
+  --color-surface-hi: #1f1c16;
+  --color-border: rgba(244, 241, 234, 0.08);
+  --color-border-strong: rgba(244, 241, 234, 0.16);
+  --color-text: #f4f1ea;
+  --color-muted: #8a8278;
+  --color-faint: #5a5650;
+  --color-danger: #ff7a6e;
+  --color-success: #9be59b;
+
+  /* Default accent: lime */
+  --color-accent: #dffe60;
+  --color-accent-ink: #0d0c0a;
+  --color-accent-soft: rgba(223, 254, 96, 0.14);
+  --color-accent-dim: rgba(223, 254, 96, 0.55);
+}
+
+/* ── Palette overrides ───────────────────────────────────────────────────── */
+html[data-palette="lime"] {
+  --color-accent: #dffe60;
+  --color-accent-ink: #0d0c0a;
+  --color-accent-soft: rgba(223, 254, 96, 0.14);
+  --color-accent-dim: rgba(223, 254, 96, 0.55);
+}
+
+html[data-palette="amber"] {
+  --color-accent: #ffb444;
+  --color-accent-ink: #1a1206;
+  --color-accent-soft: rgba(255, 180, 68, 0.16);
+  --color-accent-dim: rgba(255, 180, 68, 0.6);
+}
+
+html[data-palette="magenta"] {
+  --color-accent: #ff5fb0;
+  --color-accent-ink: #1a0c14;
+  --color-accent-soft: rgba(255, 95, 176, 0.16);
+  --color-accent-dim: rgba(255, 95, 176, 0.6);
+}
+
+html[data-palette="cyan"] {
+  --color-accent: #79e8ff;
+  --color-accent-ink: #0a1419;
+  --color-accent-soft: rgba(121, 232, 255, 0.16);
+  --color-accent-dim: rgba(121, 232, 255, 0.6);
+}
+
+/* Paper = light mode */
+html[data-palette="paper"] {
+  color-scheme: light;
+  --color-bg: #f6f3ed;
+  --color-surface: #fffcf5;
+  --color-surface-hi: #ebe6dc;
+  --color-border: rgba(26, 24, 20, 0.10);
+  --color-border-strong: rgba(26, 24, 20, 0.22);
+  --color-text: #1a1814;
+  --color-muted: #6b655c;
+  --color-faint: #a8a298;
+  --color-danger: #c43d2e;
+  --color-success: #2f7a3f;
+  --color-accent: #1a1814;
+  --color-accent-ink: #f6f3ed;
+  --color-accent-soft: rgba(26, 24, 20, 0.08);
+  --color-accent-dim: rgba(26, 24, 20, 0.5);
+}
+
+/* ── Tailwind theme tokens ────────────────────────────────────────────────
+   These are static values used only by Tailwind's build-time utility
+   generator. Dynamic theming is handled by the CSS vars above.           */
+@theme {
+  --color-bg: #0d0c0a;
+  --color-surface: #16140f;
+  --color-border: rgba(244, 241, 234, 0.08);
+  --color-text: #f4f1ea;
+  --color-muted: #8a8278;
+  --color-accent: #dffe60;
+}
+
+/* ── Base styles ────────────────────────────────────────────────────────── */
 html,
 body,
 #root {
@@ -18,14 +97,21 @@ body,
   color-scheme: dark;
 }
 
+html[data-palette="paper"],
+html[data-palette="paper"] body,
+html[data-palette="paper"] #root {
+  color-scheme: light;
+}
+
 body {
   margin: 0;
   padding-top: env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 
+/* ── Animation ──────────────────────────────────────────────────────────── */
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
