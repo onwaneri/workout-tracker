@@ -44,6 +44,39 @@ export const useUpsertExerciseGoal = () => {
   })
 }
 
+export const useBulkUpsertGoals = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (inputs: Array<{ exercise_id: string; target_weight: number | null; target_reps: number | null }>) => {
+      for (const input of inputs) {
+        const { data: existing } = await supabase
+          .from('goals')
+          .select('id')
+          .eq('exercise_id', input.exercise_id)
+          .maybeSingle()
+        if (existing) {
+          const { error } = await supabase
+            .from('goals')
+            .update({ target_weight: input.target_weight, target_reps: input.target_reps })
+            .eq('id', existing.id)
+          if (error) throw error
+        } else {
+          const { error } = await supabase
+            .from('goals')
+            .insert({
+              client_uuid: getClientUuid(),
+              exercise_id: input.exercise_id,
+              target_weight: input.target_weight,
+              target_reps: input.target_reps,
+            })
+          if (error) throw error
+        }
+      }
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: qk.goals() }),
+  })
+}
+
 export const useUpsertVolumeGoal = () => {
   const qc = useQueryClient()
   return useMutation({

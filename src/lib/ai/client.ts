@@ -1,6 +1,6 @@
 import { getClientUuid } from '@/lib/supabase/uuid'
-import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema, generatedPlanSchema } from './schemas'
-import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights, GeneratedPlan } from './schemas'
+import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema, generatedPlanSchema, goalSuggestionsResponseSchema } from './schemas'
+import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights, GeneratedPlan, GoalSuggestionsResponse } from './schemas'
 import type { ExerciseType } from '@/lib/supabase/database.types'
 
 const AI_BASE = '/api/ai'
@@ -94,5 +94,24 @@ export async function requestPlanGenerate(
     '/plan-generate',
     { prompt },
     (data) => generatedPlanSchema.parse(data),
+  )
+}
+
+export type GoalSuggestionsPayload = {
+  exercises: Array<{
+    name: string
+    muscle_group: string
+    type: string
+    recentSets: Array<{ weight: number | null; reps: number | null; rpe: number | null; logged_at: string }>
+  }>
+}
+
+export async function requestGoalSuggestions(
+  payload: GoalSuggestionsPayload,
+): Promise<GoalSuggestionsResponse> {
+  return aiPost(
+    '/goal-suggestions',
+    payload,
+    (data) => goalSuggestionsResponseSchema.parse(data),
   )
 }

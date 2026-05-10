@@ -109,3 +109,18 @@ export const generatedPlanSchema = z.object({
 export type GeneratedExercise = z.infer<typeof generatedExerciseSchema>
 export type GeneratedDay = z.infer<typeof generatedDaySchema>
 export type GeneratedPlan = z.infer<typeof generatedPlanSchema>
+
+// ─── Goal Suggestions Schema ────────────────────────────────────
+export const goalSuggestionSchema = z.object({
+  exercise_name: z.string(),
+  target_weight: z.number().nullable(),
+  target_reps: z.number().int().nullable(),
+  rationale: z.string(),
+})
+
+export const goalSuggestionsResponseSchema = z.object({
+  suggestions: z.array(goalSuggestionSchema),
+})
+
+export type GoalSuggestion = z.infer<typeof goalSuggestionSchema>
+export type GoalSuggestionsResponse = z.infer<typeof goalSuggestionsResponseSchema>
