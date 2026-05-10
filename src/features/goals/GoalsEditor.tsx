@@ -87,7 +87,7 @@ export function GoalsEditor() {
         const result = await requestGoalSuggestions(payload)
         const nameToId = new Map(exercises.map((e) => [e.name, e.id]))
         const upserts = result.suggestions
-          .filter((s) => nameToId.has(s.exercise_name) && (s.target_weight != null || s.target_reps != null))
+          .filter((s) => nameToId.has(s.exercise_name))
           .map((s) => ({
             exercise_id: nameToId.get(s.exercise_name)!,
             target_weight: s.target_weight,
