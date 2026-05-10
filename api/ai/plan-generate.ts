@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
-import { generatedPlanSchema } from '../../src/lib/ai/schemas'
+import { generatedPlanSchema } from '../../src/lib/ai/schemas.js'
 
 // Simple in-memory rate limiting: max 20 requests per minute per client
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
