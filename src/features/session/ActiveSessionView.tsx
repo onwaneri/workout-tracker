@@ -81,6 +81,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
 
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
   const [currentExIdx, setCurrentExIdx] = useState(0)
+  const [endError, setEndError] = useState<string | null>(null)
 
   const sortedExercises = useMemo(
     () => [...(exercises.data ?? [])].sort((a, b) => a.order_index - b.order_index),
@@ -223,9 +224,14 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   }
 
   const onComplete2 = async () => {
+    setEndError(null)
     finalizeRest()
-    await endSession.mutateAsync({ id: sessionId, foreground_ms: foregroundMs, background_ms: backgroundMs })
-    onComplete()
+    try {
+      await endSession.mutateAsync({ id: sessionId, foreground_ms: foregroundMs, background_ms: backgroundMs })
+      onComplete()
+    } catch (e) {
+      setEndError(e instanceof Error ? e.message : 'Failed to save session')
+    }
   }
 
   const onCancelClick = async () => {
@@ -274,12 +280,18 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
           style={{
             background: 'none', border: 'none', color: 'var(--color-text)',
             fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
-            fontWeight: 600, cursor: 'pointer', minHeight: 44,
+            fontWeight: 600, cursor: 'pointer', minHeight: 44, padding: '0 12px',
           }}
         >
           {endSession.isPending ? 'Saving…' : 'Done'}
         </button>
       </div>
+
+      {endError && (
+        <div style={{ margin: '0 20px', padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#f87171' }}>
+          {endError} — tap Done to retry.
+        </div>
+      )}
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 120px', display: 'flex', flexDirection: 'column' }}>
 
