@@ -136,25 +136,23 @@ export const useEndSession = () => {
           .single()
         if (error) throw error
         return data as Session
-      } catch (err) {
-        if (!navigator.onLine || err instanceof TypeError) {
-          await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
-          const cached =
-            qc.getQueryData<Session>(qk.session(input.id)) ??
-            qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
-          if (cached) return { ...cached, ...payload }
-          return {
-            id: input.id,
-            client_uuid: getClientUuid(),
-            plan_version_id: '',
-            workout_day_id: '',
-            started_at: payload.ended_at,
-            ended_at: payload.ended_at,
-            foreground_ms: payload.foreground_ms,
-            background_ms: payload.background_ms,
-          }
+      } catch {
+        // Any failure (offline, timeout, RLS, network) → enqueue and let user proceed
+        await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
+        const cached =
+          qc.getQueryData<Session>(qk.session(input.id)) ??
+          qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
+        if (cached) return { ...cached, ...payload }
+        return {
+          id: input.id,
+          client_uuid: getClientUuid(),
+          plan_version_id: '',
+          workout_day_id: '',
+          started_at: payload.ended_at,
+          ended_at: payload.ended_at,
+          foreground_ms: payload.foreground_ms,
+          background_ms: payload.background_ms,
         }
-        throw err
       }
     },
     onSuccess: (s) => {
