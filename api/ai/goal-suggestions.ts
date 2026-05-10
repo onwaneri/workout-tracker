@@ -119,9 +119,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No text response from AI' })
     }
 
+    // Strip markdown fences the model sometimes adds despite instructions
+    const raw = textBlock.text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+
     let parsed: unknown
     try {
-      parsed = JSON.parse(textBlock.text)
+      parsed = JSON.parse(raw)
     } catch {
       return res.status(502).json({ error: 'AI returned invalid JSON', raw: textBlock.text })
     }
