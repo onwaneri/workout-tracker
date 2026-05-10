@@ -111,7 +111,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '{' },
+      ],
     })
 
     const textBlock = response.content.find((b) => b.type === 'text')
@@ -119,14 +122,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No text response from AI' })
     }
 
-    // Strip markdown fences the model sometimes adds despite instructions
-    const raw = textBlock.text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/i, '').trim()
+    // Prepend the '{' we used as prefill since the model continues from there
+    const jsonText = '{' + textBlock.text
 
     let parsed: unknown
     try {
-      parsed = JSON.parse(raw)
+      parsed = JSON.parse(jsonText)
     } catch {
-      return res.status(502).json({ error: 'AI returned invalid JSON', raw: textBlock.text })
+      return res.status(502).json({ error: 'AI returned invalid JSON', raw: jsonText })
     }
 
     return res.status(200).json(parsed)
