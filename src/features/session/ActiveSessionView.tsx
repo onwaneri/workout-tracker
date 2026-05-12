@@ -8,6 +8,7 @@ import {
   useUpdateSetRest,
   useCancelSession,
   useLastSetsForExercises,
+  useUnskipExercise,
 } from '@/lib/queries/sessions'
 import { useSessionSwaps, useCreateSwap } from '@/lib/queries/swaps'
 import { SetRow } from './SetRow'
@@ -71,6 +72,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   const logSet = useLogSet()
   const updateRest = useUpdateSetRest()
   const cancelSession = useCancelSession()
+  const unskip = useUnskipExercise()
 
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
   const [currentExIdx, setCurrentExIdx] = useState(0)
@@ -224,6 +226,10 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     setView('overview')
   }
 
+  const onUnskip = (e: Exercise) => {
+    unskip.mutate({ sessionId, exerciseId: e.id })
+  }
+
   const onComplete2 = async () => {
     setEndError(null)
     finalizeRest()
@@ -358,8 +364,19 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
 
             {/* Input form */}
             {isCurrentSkipped ? (
-              <div style={{ textAlign: 'center', padding: '24px 0', fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-muted)' }}>
-                Skipped
+              <div style={{ textAlign: 'center', padding: '24px 0' }}>
+                <button
+                  type="button"
+                  onClick={() => onUnskip(currentEx)}
+                  style={{
+                    background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+                    borderRadius: 10, padding: '12px 24px', minHeight: 44,
+                    fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--color-text)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Undo skip
+                </button>
               </div>
             ) : (
               <SetRow

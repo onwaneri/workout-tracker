@@ -80,6 +80,9 @@ export function ExerciseSwapSheet({
               'Suggest Alternatives'
             )}
           </Button>
+          <Button variant="ghost" onClick={handleClose} className="w-full mt-2">
+            Cancel
+          </Button>
         </>
       )}
 

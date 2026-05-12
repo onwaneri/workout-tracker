@@ -151,12 +151,15 @@ export const useEndSession = () => {
           .update(payload)
           .eq('id', input.id)
           .select('*')
-          .single()
+          .maybeSingle()
         if (error) throw error
+        if (!data) throw new Error(`Session row not found or not visible after update (id=${input.id})`)
         return data as Session
-      } catch {
-        // Any failure (offline, timeout, RLS, network) → enqueue and let user proceed
-        await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
+      } catch (err) {
+        console.error('[useEndSession] Failed to persist ended_at:', err)
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
+        }
         const cached =
           qc.getQueryData<Session>(qk.session(input.id)) ??
           qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
@@ -248,6 +251,33 @@ export const useCancelSession = () => {
       qc.invalidateQueries({ queryKey: qk.sessions() })
       qc.invalidateQueries({ queryKey: qk.session(vars.id) })
       qc.invalidateQueries({ queryKey: qk.sessionSets(vars.id) })
+    },
+  })
+}
+
+export const useUnskipExercise = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: async (input: { sessionId: string; exerciseId: string }) => {
+      const filter = { session_id: input.sessionId, exercise_id: input.exerciseId, is_skipped: true }
+      try {
+        const { error } = await supabase
+          .from('session_sets')
+          .delete()
+          .eq('session_id', input.sessionId)
+          .eq('exercise_id', input.exerciseId)
+          .eq('is_skipped', true)
+        if (error) throw error
+      } catch (err) {
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'session_sets', op: 'delete', payload: {}, filter })
+          return
+        }
+        throw err
+      }
+    },
+    onSuccess: (_data, vars) => {
+      qc.invalidateQueries({ queryKey: qk.sessionSets(vars.sessionId) })
     },
   })
 }
