@@ -96,18 +96,36 @@ export const useLastSetsForExercises = (exerciseIds: string[]) => {
 export const useStartSession = () => {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: async (input: { plan_version_id: string; workout_day_id: string }) => {
-      const { data, error } = await supabase
-        .from('sessions')
-        .insert({
-          client_uuid: getClientUuid(),
-          plan_version_id: input.plan_version_id,
-          workout_day_id: input.workout_day_id,
-        })
-        .select('*')
-        .single()
-      if (error) throw error
-      return data as Session
+    mutationFn: async (input: { plan_version_id: string; workout_day_id: string }): Promise<Session> => {
+      const payload = {
+        client_uuid: getClientUuid(),
+        plan_version_id: input.plan_version_id,
+        workout_day_id: input.workout_day_id,
+      }
+      try {
+        const { data, error } = await supabase
+          .from('sessions')
+          .insert(payload)
+          .select('*')
+          .single()
+        if (error) throw error
+        return data as Session
+      } catch (err) {
+        if (!navigator.onLine || err instanceof TypeError) {
+          await enqueueMutation({ table: 'sessions', op: 'insert', payload })
+          return {
+            id: crypto.randomUUID(),
+            client_uuid: payload.client_uuid,
+            plan_version_id: input.plan_version_id,
+            workout_day_id: input.workout_day_id,
+            started_at: new Date().toISOString(),
+            ended_at: null,
+            foreground_ms: 0,
+            background_ms: 0,
+          }
+        }
+        throw err
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: qk.sessions() }),
   })

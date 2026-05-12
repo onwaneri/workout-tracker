@@ -209,7 +209,7 @@ export function SetRow({
                   background: sel ? 'var(--color-accent)' : 'var(--color-surface)',
                   color: sel ? 'var(--color-accent-ink)' : 'var(--color-text)',
                   fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
-                  cursor: 'pointer', fontFeatureSettings: '"tnum"', minHeight: 40,
+                  cursor: 'pointer', fontFeatureSettings: '"tnum"', minHeight: 44,
                 }}
               >
                 {v}

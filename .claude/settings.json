@@ -22,7 +22,16 @@
       "Bash(git mv *)",
       "Bash(supabase db *)",
       "Bash(supabase --version)",
-      "Bash(supabase status *)"
+      "Bash(supabase status *)",
+      "WebFetch(domain:api.anthropic.com)",
+      "Bash(gunzip -c \"/Users/ndnwaneri/.claude/projects/-Users-ndnwaneri-Projects-Workout-Tracker/266f7c5e-d91f-4109-867f-dec55d9e949e/tool-results/webfetch-1778369956753-59jcsf.bin\")",
+      "Bash(mkdir -p /tmp/workout-design)",
+      "Bash(cp \"/Users/ndnwaneri/.claude/projects/-Users-ndnwaneri-Projects-Workout-Tracker/266f7c5e-d91f-4109-867f-dec55d9e949e/tool-results/webfetch-1778369956753-59jcsf.bin\" /tmp/workout-design/bundle.tar.gz)",
+      "Read(//tmp/**)",
+      "Bash(tar -xzf bundle.tar.gz)",
+      "Bash(curl -s http://localhost:5175)",
+      "Bash(pkill -f \"vite --port 5175\")",
+      "Bash(xargs ls *)"
     ]
   }
 }

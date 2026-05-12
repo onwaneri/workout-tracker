@@ -85,10 +85,10 @@ export function DayEditor({
           />
           Rest
         </label>
-        <button onClick={onMoveUp} aria-label="Move day up" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↑</button>
-        <button onClick={onMoveDown} aria-label="Move day down" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↓</button>
+        <button onClick={onMoveUp} aria-label="Move day up" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↑</button>
+        <button onClick={onMoveDown} aria-label="Move day down" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 16 }}>↓</button>
         {onRemove && (
-          <button onClick={onRemove} aria-label="Remove day" style={{ minHeight: 44, minWidth: 32, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 18 }}>×</button>
+          <button onClick={onRemove} aria-label="Remove day" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 18 }}>×</button>
         )}
       </div>
 
@@ -97,82 +97,71 @@ export function DayEditor({
         <>
           {day.exercises.length > 0 && (
             <div>
-              {/* Column headers */}
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '24px 1fr 80px 90px 48px 72px',
-                gap: 8,
-                padding: '8px 16px',
-                borderBottom: '1px solid var(--color-border)',
-                fontFamily: 'var(--font-mono)',
-                fontSize: 9,
-                letterSpacing: '0.1em',
-                textTransform: 'uppercase',
-                color: 'var(--color-muted)',
-              }}>
-                <span>#</span>
-                <span>Exercise</span>
-                <span>Muscle</span>
-                <span>Type</span>
-                <span style={{ textAlign: 'center' }}>Sets</span>
-                <span />
-              </div>
-
               {day.exercises.map((e, i) => (
                 <div
                   key={i}
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '24px 1fr 80px 90px 48px 72px',
-                    gap: 8,
                     padding: '10px 16px',
-                    alignItems: 'center',
                     borderTop: i > 0 ? '1px solid var(--color-border)' : 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
                   }}
                 >
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', fontFeatureSettings: '"tnum"' }}>
-                    {i + 1}
-                  </span>
-                  <input
-                    value={e.name}
-                    onChange={(ev) => updateExercise(i, { name: ev.target.value })}
-                    style={{ ...inputBase, fontWeight: 500 }}
-                  />
-                  <input
-                    value={e.muscle_group}
-                    onChange={(ev) => updateExercise(i, { muscle_group: ev.target.value })}
-                    placeholder="Group"
-                    style={{ ...inputBase, fontSize: 12, color: 'var(--color-muted)' }}
-                  />
-                  <select
-                    value={e.type}
-                    onChange={(ev) => updateExercise(i, { type: ev.target.value as 'compound' | 'isolation' })}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      outline: 'none',
-                      color: 'var(--color-muted)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 11,
-                      cursor: 'pointer',
-                      minWidth: 0,
-                    }}
-                  >
-                    <option value="compound">Compound</option>
-                    <option value="isolation">Isolation</option>
-                  </select>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={e.default_sets}
-                    onChange={(ev) => updateExercise(i, { default_sets: Math.max(1, Number(ev.target.value) || 1) })}
-                    aria-label="Default sets"
-                    style={{ ...inputBase, width: '100%', textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontFeatureSettings: '"tnum"' }}
-                  />
-                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 0 }}>
-                    <button onClick={() => moveExercise(i, i - 1)} aria-label="Move up" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↑</button>
-                    <button onClick={() => moveExercise(i, i + 1)} aria-label="Move down" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↓</button>
-                    <button onClick={() => removeExercise(i)} aria-label="Remove" style={{ minHeight: 44, width: 24, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 16 }}>×</button>
+                  {/* Row 1: index + name + action buttons */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', fontFeatureSettings: '"tnum"', flexShrink: 0, width: 20 }}>
+                      {i + 1}
+                    </span>
+                    <input
+                      value={e.name}
+                      onChange={(ev) => updateExercise(i, { name: ev.target.value })}
+                      placeholder="Exercise name"
+                      style={{ ...inputBase, fontWeight: 500, flex: 1 }}
+                    />
+                    <div style={{ display: 'flex', gap: 0, flexShrink: 0 }}>
+                      <button onClick={() => moveExercise(i, i - 1)} aria-label="Move up" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↑</button>
+                      <button onClick={() => moveExercise(i, i + 1)} aria-label="Move down" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-muted)', fontSize: 14 }}>↓</button>
+                      <button onClick={() => removeExercise(i)} aria-label="Remove" style={{ minHeight: 44, minWidth: 44, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 16 }}>×</button>
+                    </div>
+                  </div>
+                  {/* Row 2: muscle group + type + sets */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 28 }}>
+                    <input
+                      value={e.muscle_group}
+                      onChange={(ev) => updateExercise(i, { muscle_group: ev.target.value })}
+                      placeholder="Muscle group"
+                      style={{ ...inputBase, fontSize: 12, color: 'var(--color-muted)', flex: 1 }}
+                    />
+                    <select
+                      value={e.type}
+                      onChange={(ev) => updateExercise(i, { type: ev.target.value as 'compound' | 'isolation' })}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: 'var(--color-muted)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        minWidth: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <option value="compound">Compound</option>
+                      <option value="isolation">Isolation</option>
+                    </select>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Sets</span>
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        value={e.default_sets}
+                        onChange={(ev) => updateExercise(i, { default_sets: Math.max(1, Number(ev.target.value) || 1) })}
+                        aria-label="Default sets"
+                        style={{ ...inputBase, width: 40, textAlign: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontFeatureSettings: '"tnum"' }}
+                      />
+                    </div>
                   </div>
                 </div>
               ))}

@@ -154,7 +154,7 @@ export function PlanEditorView() {
           onClick={onSave}
           disabled={saving || busy}
           style={{
-            minHeight: 36,
+            minHeight: 44,
             padding: '0 16px',
             borderRadius: 10,
             border: 'none',

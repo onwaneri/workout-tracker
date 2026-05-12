@@ -159,6 +159,97 @@
 - `/src/features/session-stats/SessionSummary.tsx` - optimized skipped exercise detection
 - `/src/main.tsx` - targeted invalidations after queue drain
 
+## AI Endpoints Layer (2026-05-09 Audit)
+
+### Serverless Memory Leak: Unbounded Rate Limit Maps
+- **Pattern**: All 4 AI endpoints (`plan-generate`, `plan-edit`, `exercise-swap`, `session-insights`) use in-memory `rateLimitMap` that grows unbounded
+- **Issue**: Every unique `client_uuid` adds an entry; expired entries never cleaned up
+- **Impact**: Over weeks/months, serverless function memory grows; could hit platform limits
+- **Fix**: Prune expired entries when map exceeds threshold (10K entries)
+- **Files**: All `/api/ai/*.ts` endpoints
+- **Takeaway**: Any in-memory Map/Set in serverless functions needs size cap + periodic cleanup
+
+### Client UUID Pattern: Module-Level Evaluation
+- **Pattern**: `getClientUuid()` called on every AI request in `aiPost` helper
+- **Issue**: Redundant function call (reads localStorage each time)
+- **Fix**: Evaluate once at module load: `const CLIENT_UUID = getClientUuid()`
+- **File**: `/src/lib/ai/client.ts`
+- **Consistency**: Matches query layer pattern from `keys.ts` audit
+
+### Schema Validation Gaps
+- **Pattern**: `session-insights.ts` validates request body with Zod; `plan-generate.ts` did not validate response
+- **Issue**: Malformed AI responses bypass server-side validation, reach client
+- **Fix**: Import schema, validate with `.safeParse()` before returning
+- **Best Practice**: All AI endpoints should validate both request AND response server-side
+
+### Error Handling: Raw Text Leakage
+- **Pattern**: On JSON parse failure, endpoints return `raw: textBlock.text` in error response
+- **Issue**: Multi-KB AI responses in client errors; potential sensitive data exposure
+- **Fix**: Log raw text server-side (first 500 chars), return sanitized error to client
+- **Note**: Issue exists in all 4 endpoints; fixed in `plan-generate.ts`, recommend applying to siblings
+
+## Plan Editor Layer (2026-05-09 Audit)
+
+### Query Invalidation Anti-Pattern (CRITICAL)
+- **Pattern**: `qc.invalidateQueries()` with no filter in plan mutations
+- **Files**: `CreatePlanView.tsx`, `PlanEditorView.tsx`, `plans.ts` (useCreatePlan, useSwitchActivePlan)
+- **Issue**: Every plan edit/create/switch invalidated ALL queries (sessions, history, stats) — expensive on mobile
+- **Fix**: Target specific keys: `['plans']`, `['activePlanVersion']`, `['workoutDays']`, `['exercises']`
+- **Impact**: **HIGH** — prevents unnecessary refetch of session/history data on plan edits
+- **Rule**: Always specify `{ queryKey: [...] }` when invalidating; never blanket invalidate
+
+### DayEditor Callback Stability
+- **Pattern**: Inline callbacks passed to DayEditor in map function: `onChange={(next) => ...}`, `onMoveUp={() => ...}`
+- **Issue**: Creates new references on every render, causing all DayEditor children to re-render
+- **Fix**: Extract `updateDay`, `moveDay`, `removeDay` to `useCallback`, pass stable refs
+- **Impact**: Each day change now only re-renders affected DayEditor, not all 3-10 days
+- **Scale Impact**: Compounds with number of days (up to 10 max)
+
+### Type Assertion Cleanup
+- **Pattern**: Overly complex conditional type in `exercisesByDay` useMemo: `typeof X extends infer T ? ...`
+- **Fix**: Use `NonNullable<typeof allExercises.data>[number]` for array element type
+- **Impact**: Readability, type safety
+
+### AI Chat planSnapshot Recomputation
+- **Pattern**: `planSnapshot` object recreated on every render in `AiPlanChat`
+- **Fix**: Wrapped in `useMemo(() => ({ ... }), [draft])`
+- **Impact**: Prevents object allocations on every render, especially important when AI chat is expanded
+
+### Files Modified (Plan Editor Audit)
+- `/src/lib/queries/plans.ts` - targeted invalidations in useCreatePlan, useSwitchActivePlan
+- `/src/features/plan-editor/CreatePlanView.tsx` - targeted invalidations, stable callbacks
+- `/src/features/plan-editor/PlanEditorView.tsx` - targeted invalidations, stable DayEditor callbacks, type cleanup
+- `/src/features/plan-editor/AiPlanChat.tsx` - memoized planSnapshot, stable event handlers
+
+## CRITICAL RULES (Bugs Previously Introduced)
+
+### 1. NEVER Place Hooks After Early Returns
+- **What happened**: Added `useCallback` wrappers to functions defined AFTER an early `return` statement in a component. This violates React's Rules of Hooks — hooks must be called unconditionally in the same order every render.
+- **Symptoms**: Component crashes with black screen, React throws "Rendered fewer hooks than expected" error
+- **Rule**: Before adding `useCallback`/`useMemo`, ALWAYS check if the code is after a conditional return. If it is, either:
+  - Move the hook ABOVE all early returns, OR
+  - Leave it as a plain function (functions after guards don't need memoization since the component won't re-render in the "returned early" state anyway)
+- **Also applies to**: `useCallback` inside JSX (e.g., `onApplyDiff={useCallback(...)}`). This is ALWAYS wrong — hooks cannot be called inside JSX expressions.
+
+### 2. ALWAYS Verify Query Key Strings Against keys.ts
+- **What happened**: Used camelCase key strings (`['activePlanVersion']`, `['workoutDays']`) that didn't match the actual kebab-case keys in `src/lib/queries/keys.ts` (`['plan-version', ...]`, `['workout-days', ...]`). This caused invalidations to silently fail — queries were never refreshed.
+- **Symptoms**: UI shows stale data after mutations, plan switching doesn't update Today view, sessions appear stuck
+- **Rule**: Before writing ANY `invalidateQueries({ queryKey: [...] })` call:
+  1. Read `src/lib/queries/keys.ts` to see the actual key structure
+  2. Use the FIRST element of the actual key array as the prefix for invalidation
+  3. TanStack Query matches by prefix, so `['plan-version']` matches `['plan-version', 'active', uuid]`
+- **Current keys** (from `src/lib/queries/keys.ts`):
+  - Plans: `['plans', uuid]`
+  - Active plan version: `['plan-version', 'active', uuid]`
+  - Workout days: `['workout-days', uuid, pvId]`
+  - Exercises: `['exercises', uuid, dayId]`
+  - Sessions: `['sessions', uuid]`
+  - Session sets: `['session-sets', uuid, sessionId]`
+
+### 3. Run TypeScript Check After Every Edit
+- **Rule**: After making changes, ALWAYS run `npx tsc --noEmit` to catch compile errors before reporting success
+- **Reason**: Removed imports, renamed variables, or type mismatches from refactoring won't show as runtime errors but will break the build
+
 ## Recommendations for Future Features
 
 1. **Always memoize Date parsing** - it's expensive and often done with stable data
@@ -168,3 +259,6 @@
 5. **Zustand callbacks**: Extract granular selectors, never use entire hook in deps
 6. **Ref Maps**: Add cleanup effect when keys can go stale
 7. **Supabase `.in()` queries**: Always add `.limit()` for safety
+8. **Serverless in-memory collections**: Add size caps and periodic cleanup for Maps/Sets
+9. **AI endpoints**: Validate both request AND response schemas server-side
+10. **Query invalidations**: Always use `{ queryKey: [...] }` filter; never blanket `invalidateQueries()`

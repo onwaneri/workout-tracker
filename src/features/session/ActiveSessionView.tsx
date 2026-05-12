@@ -16,6 +16,7 @@ import { useRestNotification, scheduleRestNotification, cancelRestNotification }
 import { restTargetSeconds } from './restTargets'
 import { RestTimerBanner } from './RestTimerBanner'
 import { ExerciseSwapSheet } from './ExerciseSwapSheet'
+import { ExercisePickerSheet } from './ExercisePickerSheet'
 import { fmtDuration } from '@/lib/format'
 import { BODYWEIGHT_LBS, isBodyweightExercise } from '@/lib/constants'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
@@ -42,6 +43,14 @@ function SkipIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 5l9 7-9 7V5ZM18 5v14"/>
+    </svg>
+  )
+}
+
+function ListIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
     </svg>
   )
 }
@@ -81,6 +90,8 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
 
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
   const [currentExIdx, setCurrentExIdx] = useState(0)
+  const [_pendingNextIdx, setPendingNextIdx] = useState<number | null>(null)
+  const [showPicker, setShowPicker] = useState(false)
   const [endError, setEndError] = useState<string | null>(null)
 
   const sortedExercises = useMemo(
@@ -168,6 +179,10 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     updateRest.mutate({ setId: t.setId, sessionId, restMs })
     cancelRestNotification()
     clearRestFn()
+    setPendingNextIdx((idx) => {
+      if (idx !== null) setCurrentExIdx(idx)
+      return null
+    })
   }, [sessionId, updateRest, clearRestFn])
 
   const addRestTime = useCallback((extraSeconds: number) => {
@@ -206,10 +221,10 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       scheduleRestNotification(target, `Rest done — ${e.name}`)
       startRestFn({ setId: inserted.id, exerciseId: e.id, exerciseName: e.name, targetSeconds: target, startedAt: Date.now() })
     }
-    // Auto-advance when all working sets done for this exercise
+    // Defer advance until rest is dismissed so user returns to the exercise they just finished
     if (!payload.isWarmup && setOrder >= e.default_sets) {
       const nextIdx = currentExIdx + 1
-      if (nextIdx < sortedExercises.length) setCurrentExIdx(nextIdx)
+      if (nextIdx < sortedExercises.length) setPendingNextIdx(nextIdx)
     }
   }
 
@@ -266,7 +281,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
             cursor: 'pointer', minHeight: 44,
           }}
         >
-          <XIcon /> End
+          <XIcon /> Cancel
         </button>
 
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
@@ -295,23 +310,36 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
 
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 120px', display: 'flex', flexDirection: 'column' }}>
 
-        {/* Progress bar — one segment per exercise */}
-        <div style={{ display: 'flex', gap: 4, marginBottom: 20 }}>
-          {sortedExercises.map((e, i) => {
-            const done = skippedIds.has(e.id) || (setsByExercise.get(e.id) ?? 0) >= e.default_sets
-            const active = i === currentExIdx
-            return (
-              <button
-                key={e.id}
-                onClick={() => setCurrentExIdx(i)}
-                style={{
-                  flex: 1, height: 4, borderRadius: 3, border: 'none', padding: 0, cursor: 'pointer',
-                  background: done ? 'var(--color-accent)' : active ? 'var(--color-accent-dim)' : 'var(--color-border)',
-                  opacity: done ? 1 : active ? 1 : 0.5,
-                }}
-              />
-            )
-          })}
+        {/* Progress bar — one segment per exercise, list icon opens full picker */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
+          <div style={{ flex: 1, display: 'flex', gap: 4 }}>
+            {sortedExercises.map((e, i) => {
+              const done = skippedIds.has(e.id) || (setsByExercise.get(e.id) ?? 0) >= e.default_sets
+              const active = i === currentExIdx
+              return (
+                <button
+                  key={e.id}
+                  onClick={() => setCurrentExIdx(i)}
+                  style={{
+                    flex: 1, height: 4, borderRadius: 3, border: 'none', padding: 0, cursor: 'pointer',
+                    background: done ? 'var(--color-accent)' : active ? 'var(--color-accent-dim)' : 'var(--color-border)',
+                    opacity: done ? 1 : active ? 1 : 0.5,
+                  }}
+                />
+              )
+            })}
+          </div>
+          <button
+            onClick={() => setShowPicker(true)}
+            title="All exercises"
+            style={{
+              background: 'none', border: 'none', color: 'var(--color-muted)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              minHeight: 44, minWidth: 44, padding: 4,
+            }}
+          >
+            <ListIcon />
+          </button>
         </div>
 
         {currentEx && (
@@ -436,6 +464,16 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
           onSwap={handleSwapConfirm}
         />
       )}
+
+      <ExercisePickerSheet
+        open={showPicker}
+        onClose={() => setShowPicker(false)}
+        exercises={sortedExercises}
+        currentExIdx={currentExIdx}
+        setsByExercise={setsByExercise}
+        skippedIds={skippedIds}
+        onSelect={(idx) => setCurrentExIdx(idx)}
+      />
     </section>
   )
 }
@@ -446,7 +484,7 @@ function IconBtn({ onClick, title, children }: { onClick: () => void; title: str
       onClick={onClick}
       title={title}
       style={{
-        width: 40, height: 40, borderRadius: 12,
+        width: 44, height: 44, borderRadius: 12,
         border: '1px solid var(--color-border)',
         background: 'var(--color-surface)', color: 'var(--color-text)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
