@@ -1,12 +1,13 @@
 import type { PlanEditAction } from '@/lib/ai/schemas'
 import type { EditedDay, EditedExercise, EditedPlan } from './snapshotPlan'
-import type { ExerciseType } from '@/lib/supabase/database.types'
+import type { Exercise, ExerciseType } from '@/lib/supabase/database.types'
+import { findMatchingExerciseId } from '@/lib/queries/exercises'
 
 /**
  * Applies a list of AI-generated plan edit actions to an EditedPlan draft.
  * Returns a new EditedPlan (immutable). Throws on invalid references.
  */
-export function applyAiDiff(plan: EditedPlan, actions: PlanEditAction[]): EditedPlan {
+export function applyAiDiff(plan: EditedPlan, actions: PlanEditAction[], allExercises?: Exercise[]): EditedPlan {
   // Deep clone the days array to avoid mutation
   let days: EditedDay[] = plan.days.map((d) => ({
     ...d,
@@ -26,6 +27,7 @@ export function applyAiDiff(plan: EditedPlan, actions: PlanEditAction[]): Edited
           muscle_group: action.exercise.muscle_group,
           type: action.exercise.type as ExerciseType,
           default_sets: action.exercise.default_sets,
+          prevExerciseId: allExercises ? findMatchingExerciseId(action.exercise.name, allExercises) : undefined,
         }
         const pos = Math.min(action.position, day.exercises.length)
         day.exercises.splice(pos, 0, newEx)

@@ -3,6 +3,7 @@ import { Screen } from '@/components/Screen'
 import { Button } from '@/components/Button'
 import { useView } from '@/lib/view'
 import { useCreatePlan } from '@/lib/queries/plans'
+import { useAllExercises, findMatchingExerciseId } from '@/lib/queries/exercises'
 import { snapshotPlan, type EditedPlan } from './snapshotPlan'
 import { useQueryClient } from '@tanstack/react-query'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
@@ -17,6 +18,7 @@ type Mode = 'ai' | 'manual'
 export function CreatePlanView() {
   const setView = useView((s) => s.setView)
   const createPlan = useCreatePlan()
+  const allExercises = useAllExercises()
   const qc = useQueryClient()
 
   const aiEnabled = isAiFeaturesEnabled()
@@ -101,6 +103,7 @@ export function CreatePlanView() {
             muscle_group: e.muscle_group,
             type: e.type,
             default_sets: e.default_sets,
+            prevExerciseId: findMatchingExerciseId(e.name, allExercises.data ?? []),
           })),
         })),
       }

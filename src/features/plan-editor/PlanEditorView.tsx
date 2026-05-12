@@ -347,7 +347,7 @@ export function PlanEditorView() {
           draft={draft}
           onApplyDiff={(actions: PlanEditAction[]) => {
             try {
-              const updated = applyAiDiff(draft, actions)
+              const updated = applyAiDiff(draft, actions, allExercises.data)
               setDraft(updated)
             } catch {
               // diff application failure is non-fatal

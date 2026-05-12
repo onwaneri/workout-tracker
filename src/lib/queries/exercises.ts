@@ -37,6 +37,18 @@ export const useAllExercises = () =>
     staleTime: 5 * 60 * 1000,
   })
 
+// Returns the ID of the most recently created exercise whose name matches (case-insensitive, trimmed).
+export function findMatchingExerciseId(name: string, all: Exercise[]): string | null {
+  const norm = name.trim().toLowerCase()
+  let best: Exercise | null = null
+  for (const e of all) {
+    if (e.name.trim().toLowerCase() === norm) {
+      if (!best || e.created_at > best.created_at) best = e
+    }
+  }
+  return best?.id ?? null
+}
+
 // Walks previous_exercise_id chain so renamed/reordered exercises share history.
 // NOTE: This function rebuilds maps on every call. Ensure it's wrapped in useMemo at call sites.
 export function resolveExerciseLineage(targetId: string, all: Exercise[]): string[] {

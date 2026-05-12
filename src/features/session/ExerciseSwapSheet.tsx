@@ -4,17 +4,20 @@ import { Button } from '@/components/Button'
 import { requestExerciseSwap } from '@/lib/ai/client'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
 import type { Exercise } from '@/lib/supabase/database.types'
+import { findMatchingExerciseId } from '@/lib/queries/exercises'
 
 export function ExerciseSwapSheet({
   exercise,
   open,
   onClose,
   onSwap,
+  allExercises,
 }: {
   exercise: Exercise
   open: boolean
   onClose: () => void
-  onSwap: (suggestion: SwapSuggestion) => void
+  onSwap: (suggestion: SwapSuggestion, matchedExerciseId: string | null) => void
+  allExercises?: Exercise[]
 }) {
   const [reason, setReason] = useState('')
   const [loading, setLoading] = useState(false)
@@ -101,7 +104,7 @@ export function ExerciseSwapSheet({
           {suggestions.map((s, i) => (
             <button
               key={i}
-              onClick={() => onSwap(s)}
+              onClick={() => onSwap(s, allExercises ? findMatchingExerciseId(s.name, allExercises) : null)}
               className="w-full text-left rounded-xl border border-[color:var(--color-border)] bg-white/5 p-3 hover:bg-white/10 transition min-h-[44px]"
             >
               <div className="flex items-center justify-between mb-1">

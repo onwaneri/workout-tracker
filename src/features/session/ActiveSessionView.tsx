@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from './sessionStore'
-import { useExercises } from '@/lib/queries/exercises'
+import { useExercises, useAllExercises } from '@/lib/queries/exercises'
 import {
   useSessionSets,
   useEndSession,
@@ -62,11 +62,10 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   useRestNotification(sessionId)
 
   const exercises = useExercises(workoutDayId ?? undefined)
+  const allExercisesQuery = useAllExercises()
   const sets = useSessionSets(sessionId ?? undefined)
   const swaps = useSessionSwaps(sessionId ?? undefined)
   const createSwap = useCreateSwap()
-  const exerciseIds = useMemo(() => (exercises.data ?? []).map((e) => e.id), [exercises.data])
-  const lastSets = useLastSetsForExercises(exerciseIds)
 
   const endSession = useEndSession()
   const logSet = useLogSet()
@@ -120,6 +119,25 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     return (sets.data ?? []).filter((s) => s.exercise_id === e.id && !s.is_skipped).sort((a, b) => a.set_order - b.set_order)
   }, [sets.data, sortedExercises, currentExIdx])
 
+  const [swapMatchedIds, setSwapMatchedIds] = useState<Map<string, string>>(new Map())
+
+  const swapMap = useMemo(() => {
+    const m = new Map<string, { name: string; muscle_group: string; type: string }>()
+    for (const s of swaps.data ?? []) {
+      m.set(s.planned_exercise_id, { name: s.performed_exercise_name, muscle_group: s.performed_muscle_group, type: s.performed_type })
+    }
+    return m
+  }, [swaps.data])
+
+  const exerciseIds = useMemo(() => {
+    const ids = (exercises.data ?? []).map((e) => e.id)
+    for (const matchedId of swapMatchedIds.values()) {
+      if (!ids.includes(matchedId)) ids.push(matchedId)
+    }
+    return ids
+  }, [exercises.data, swapMatchedIds])
+  const lastSets = useLastSetsForExercises(exerciseIds)
+
   const prefillByExercise = useMemo(() => {
     const fmt = (n: number | null) => (n == null ? '' : String(n))
     const m = new Map<string, { weight: string; reps: string; rpe: string }>()
@@ -134,19 +152,20 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       if (m.has(exId)) continue
       m.set(exId, { weight: fmt(s.weight), reps: fmt(s.reps), rpe: fmt(s.rpe) })
     }
-    return m
-  }, [sets.data, lastSets.data])
-
-  const swapMap = useMemo(() => {
-    const m = new Map<string, { name: string; muscle_group: string; type: string }>()
-    for (const s of swaps.data ?? []) {
-      m.set(s.planned_exercise_id, { name: s.performed_exercise_name, muscle_group: s.performed_muscle_group, type: s.performed_type })
+    // For swapped exercises, prefer the matched exercise's history for prefill
+    for (const [plannedId, matchedId] of swapMatchedIds) {
+      if (!m.has(plannedId) && m.has(matchedId)) {
+        m.set(plannedId, m.get(matchedId)!)
+      }
     }
     return m
-  }, [swaps.data])
+  }, [sets.data, lastSets.data, swapMatchedIds])
 
-  const handleSwapConfirm = async (suggestion: SwapSuggestion) => {
+  const handleSwapConfirm = async (suggestion: SwapSuggestion, matchedExerciseId: string | null) => {
     if (!swapTarget || !sessionId) return
+    if (matchedExerciseId) {
+      setSwapMatchedIds((prev) => new Map(prev).set(swapTarget.id, matchedExerciseId))
+    }
     await createSwap.mutateAsync({
       session_id: sessionId,
       planned_exercise_id: swapTarget.id,
@@ -398,6 +417,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
           open={!!swapTarget}
           onClose={() => setSwapTarget(null)}
           onSwap={handleSwapConfirm}
+          allExercises={allExercisesQuery.data}
         />
       )}
     </section>
