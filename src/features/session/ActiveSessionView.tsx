@@ -16,20 +16,12 @@ import { useRestNotification, scheduleRestNotification, cancelRestNotification }
 import { restTargetSeconds } from './restTargets'
 import { RestTimerBanner } from './RestTimerBanner'
 import { ExerciseSwapSheet } from './ExerciseSwapSheet'
-import { ExercisePickerSheet } from './ExercisePickerSheet'
+import { ExerciseOverviewScreen } from './ExerciseOverviewScreen'
 import { fmtDuration } from '@/lib/format'
 import { BODYWEIGHT_LBS, isBodyweightExercise } from '@/lib/constants'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import type { Exercise } from '@/lib/supabase/database.types'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
-
-function XIcon() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-      <path d="M6 6l12 12M18 6L6 18"/>
-    </svg>
-  )
-}
 
 function SwapIcon() {
   return (
@@ -43,14 +35,6 @@ function SkipIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
       <path d="M5 5l9 7-9 7V5ZM18 5v14"/>
-    </svg>
-  )
-}
-
-function ListIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>
     </svg>
   )
 }
@@ -90,8 +74,8 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
 
   const [swapTarget, setSwapTarget] = useState<Exercise | null>(null)
   const [currentExIdx, setCurrentExIdx] = useState(0)
-  const [_pendingNextIdx, setPendingNextIdx] = useState<number | null>(null)
-  const [showPicker, setShowPicker] = useState(false)
+  const [view, setView] = useState<'overview' | 'detail'>('overview')
+  const [pendingReturnToOverview, setPendingReturnToOverview] = useState(false)
   const [endError, setEndError] = useState<string | null>(null)
 
   const sortedExercises = useMemo(
@@ -179,9 +163,9 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     updateRest.mutate({ setId: t.setId, sessionId, restMs })
     cancelRestNotification()
     clearRestFn()
-    setPendingNextIdx((idx) => {
-      if (idx !== null) setCurrentExIdx(idx)
-      return null
+    setPendingReturnToOverview((shouldReturn) => {
+      if (shouldReturn) setView('overview')
+      return false
     })
   }, [sessionId, updateRest, clearRestFn])
 
@@ -221,10 +205,13 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       scheduleRestNotification(target, `Rest done — ${e.name}`)
       startRestFn({ setId: inserted.id, exerciseId: e.id, exerciseName: e.name, targetSeconds: target, startedAt: Date.now() })
     }
-    // Defer advance until rest is dismissed so user returns to the exercise they just finished
+    // When last working set is done, return to overview after rest (or immediately if no rest)
     if (!payload.isWarmup && setOrder >= e.default_sets) {
-      const nextIdx = currentExIdx + 1
-      if (nextIdx < sortedExercises.length) setPendingNextIdx(nextIdx)
+      if (target != null) {
+        setPendingReturnToOverview(true)
+      } else {
+        setView('overview')
+      }
     }
   }
 
@@ -234,8 +221,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       weight: null, reps: null, rpe: null,
       is_warmup: false, is_skipped: true, note: null, rest_target_seconds: null,
     })
-    const nextIdx = currentExIdx + 1
-    if (nextIdx < sortedExercises.length) setCurrentExIdx(nextIdx)
+    setView('overview')
   }
 
   const onComplete2 = async () => {
@@ -264,16 +250,34 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   const currentSetNum = currentEx ? (setsByExercise.get(currentEx.id) ?? 0) + 1 : 1
   const isCurrentSkipped = currentEx ? skippedIds.has(currentEx.id) : false
 
+  if (view === 'overview') {
+    return (
+      <ExerciseOverviewScreen
+        exercises={sortedExercises}
+        setsByExercise={setsByExercise}
+        skippedIds={skippedIds}
+        swapMap={swapMap}
+        elapsed={elapsed}
+        totalSetsLogged={totalSetsLogged}
+        onSelectExercise={(idx) => { setCurrentExIdx(idx); setView('detail') }}
+        onDone={onComplete2}
+        onCancel={onCancelClick}
+        endPending={endSession.isPending}
+        cancelPending={cancelSession.isPending}
+        endError={endError}
+      />
+    )
+  }
+
   return (
     <section style={{
       display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0,
       background: 'var(--color-bg)', color: 'var(--color-text)', fontFamily: 'var(--font-body)',
     }}>
-      {/* Top bar */}
+      {/* Detail view header */}
       <div style={{ padding: '6px 20px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <button
-          onClick={onCancelClick}
-          disabled={cancelSession.isPending}
+          onClick={() => setView('overview')}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'none', border: 'none', color: 'var(--color-muted)',
@@ -281,74 +285,22 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
             cursor: 'pointer', minHeight: 44,
           }}
         >
-          <XIcon /> Cancel
+          ← Back
         </button>
-
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
-          <span style={{ color: 'var(--color-accent)' }}>●</span>{' '}
-          {fmtDuration(elapsed)} · {totalSetsLogged} sets
+          {currentExIdx + 1} / {sortedExercises.length}
         </div>
-
-        <button
-          onClick={onComplete2}
-          disabled={endSession.isPending}
-          style={{
-            background: 'none', border: 'none', color: 'var(--color-text)',
-            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase',
-            fontWeight: 600, cursor: 'pointer', minHeight: 44, padding: '0 12px',
-          }}
-        >
-          {endSession.isPending ? 'Saving…' : 'Done'}
-        </button>
+        <div style={{ width: 60 }} />
       </div>
 
-      {endError && (
-        <div style={{ margin: '0 20px', padding: '8px 12px', borderRadius: 8, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', fontSize: 12, color: '#f87171' }}>
-          {endError} — tap Done to retry.
-        </div>
-      )}
-
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 20px 120px', display: 'flex', flexDirection: 'column' }}>
-
-        {/* Progress bar — one segment per exercise, list icon opens full picker */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-          <div style={{ flex: 1, display: 'flex', gap: 4 }}>
-            {sortedExercises.map((e, i) => {
-              const done = skippedIds.has(e.id) || (setsByExercise.get(e.id) ?? 0) >= e.default_sets
-              const active = i === currentExIdx
-              return (
-                <button
-                  key={e.id}
-                  onClick={() => setCurrentExIdx(i)}
-                  style={{
-                    flex: 1, height: 4, borderRadius: 3, border: 'none', padding: 0, cursor: 'pointer',
-                    background: done ? 'var(--color-accent)' : active ? 'var(--color-accent-dim)' : 'var(--color-border)',
-                    opacity: done ? 1 : active ? 1 : 0.5,
-                  }}
-                />
-              )
-            })}
-          </div>
-          <button
-            onClick={() => setShowPicker(true)}
-            title="All exercises"
-            style={{
-              background: 'none', border: 'none', color: 'var(--color-muted)',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-              minHeight: 44, minWidth: 44, padding: 4,
-            }}
-          >
-            <ListIcon />
-          </button>
-        </div>
-
         {currentEx && (
           <>
             {/* Exercise heading */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
               <div>
                 <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
-                  {currentExIdx + 1} / {sortedExercises.length} · {displayMuscle}
+                  {displayMuscle}
                   {swap && <span style={{ color: 'var(--color-accent)', marginLeft: 6 }}>swapped</span>}
                 </div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 28, fontWeight: 600, letterSpacing: '-0.03em', margin: '4px 0 0', lineHeight: 1 }}>
@@ -372,7 +324,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
               </div>
             </div>
 
-            {/* Set ladder — logged sets for current exercise */}
+            {/* Set ladder */}
             {setsForCurrent.length > 0 && (
               <div style={{ background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 16, padding: '4px 0', marginBottom: 18 }}>
                 {setsForCurrent.map((s, i) => (
@@ -388,7 +340,6 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
                     <span style={{ color: 'var(--color-accent)', display: 'flex' }}><CheckIcon /></span>
                   </div>
                 ))}
-                {/* Active row */}
                 {!isCurrentSkipped && (
                   <div style={{
                     display: 'grid', gridTemplateColumns: '40px 1fr 1fr 60px 24px', gap: 10, alignItems: 'center',
@@ -418,38 +369,6 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
                 onLog={(p) => onLogSet(currentEx, p)}
               />
             )}
-
-            {/* Exercise nav */}
-            {sortedExercises.length > 1 && (
-              <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-                <button
-                  onClick={() => setCurrentExIdx((i) => Math.max(0, i - 1))}
-                  disabled={currentExIdx === 0}
-                  style={{
-                    flex: 1, padding: '12px 0', borderRadius: 12,
-                    border: '1px solid var(--color-border)', background: 'transparent',
-                    color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer',
-                    opacity: currentExIdx === 0 ? 0.3 : 1,
-                  }}
-                >
-                  ← Prev
-                </button>
-                <button
-                  onClick={() => setCurrentExIdx((i) => Math.min(sortedExercises.length - 1, i + 1))}
-                  disabled={currentExIdx === sortedExercises.length - 1}
-                  style={{
-                    flex: 1, padding: '12px 0', borderRadius: 12,
-                    border: '1px solid var(--color-border)', background: 'transparent',
-                    color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontSize: 11,
-                    letterSpacing: '0.06em', textTransform: 'uppercase', cursor: 'pointer',
-                    opacity: currentExIdx === sortedExercises.length - 1 ? 0.3 : 1,
-                  }}
-                >
-                  Next →
-                </button>
-              </div>
-            )}
           </>
         )}
       </div>
@@ -464,16 +383,6 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
           onSwap={handleSwapConfirm}
         />
       )}
-
-      <ExercisePickerSheet
-        open={showPicker}
-        onClose={() => setShowPicker(false)}
-        exercises={sortedExercises}
-        currentExIdx={currentExIdx}
-        setsByExercise={setsByExercise}
-        skippedIds={skippedIds}
-        onSelect={(idx) => setCurrentExIdx(idx)}
-      />
     </section>
   )
 }

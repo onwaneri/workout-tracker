@@ -16,7 +16,7 @@ export type SetPrefill = {
 
 const empty: SetDraft = { weight: '', reps: '', rpe: '', isWarmup: false, note: '' }
 
-const RPE_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
+const RPE_OPTIONS = [1, 2, 3, 4, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10]
 
 function step(val: string, delta: number, isDecimal = false): string {
   const n = parseFloat(val)
@@ -196,7 +196,7 @@ export function SetRow({
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 5 }}>
+        <div style={{ display: 'flex', gap: 5, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
           {RPE_OPTIONS.map((v) => {
             const sel = selectedRpe === v
             return (
@@ -205,7 +205,7 @@ export function SetRow({
                 type="button"
                 onClick={() => setD({ ...d, rpe: sel ? '' : String(v) })}
                 style={{
-                  flex: 1, padding: '10px 0', borderRadius: 10, border: 'none',
+                  flexShrink: 0, minWidth: 44, padding: '10px 6px', borderRadius: 10, border: 'none',
                   background: sel ? 'var(--color-accent)' : 'var(--color-surface)',
                   color: sel ? 'var(--color-accent-ink)' : 'var(--color-text)',
                   fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500,
