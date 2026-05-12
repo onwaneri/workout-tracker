@@ -4,7 +4,7 @@ import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
 import { useSessions } from '@/lib/queries/sessions'
 import { useAllExercises } from '@/lib/queries/exercises'
 import { useGoals } from '@/lib/queries/goals'
-import { plannedSessionsPerWeek, sessionsInWeek, consistencyStreakWeeks } from '@/lib/stats/consistency'
+import { plannedSessionsPerWeek, sessionsInWeek } from '@/lib/stats/consistency'
 import { startOfISOWeek } from '@/lib/format'
 import { supabase } from '@/lib/supabase/client'
 import { useQuery } from '@tanstack/react-query'
@@ -46,7 +46,7 @@ export function StatsView() {
 
   const plannedPerWeek = plannedSessionsPerWeek(days.data)
   const completedThisWeek = sessionsInWeek(sessions.data, weekStart).filter((s) => s.ended_at).length
-  const streak = consistencyStreakWeeks(sessions.data, plannedPerWeek)
+  const totalCompleted = sessions.data.filter((s) => s.ended_at).length
   const weekVolume = weekSets.data ? volumeByMuscleGroup(weekSets.data, allEx.data) : new Map<string, number>()
   const weekAvgRest = weekSets.data ? avgRestMs(weekSets.data) : 0
   const volumeGoals = (goals.data ?? []).filter((g) => g.muscle_group && g.weekly_volume_target)
@@ -55,11 +55,8 @@ export function StatsView() {
   return (
     <Screen title="Stats" eyebrow="The shape of work">
 
-      {/* 13-week heatmap */}
+      {/* Monthly heatmap */}
       <div style={{ marginBottom: 28 }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 12 }}>
-          Last 13 weeks
-        </div>
         <CalendarHeatmap sessions={sessions.data} />
       </div>
 
@@ -74,8 +71,8 @@ export function StatsView() {
           value={`${completedThisWeek}/${plannedPerWeek}`}
         />
         <StatChip
-          label="Streak"
-          value={`${streak}w`}
+          label="All time"
+          value={`${totalCompleted}`}
         />
         <StatChip
           label="Avg rest"
