@@ -163,11 +163,11 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     updateRest.mutate({ setId: t.setId, sessionId, restMs })
     cancelRestNotification()
     clearRestFn()
-    setPendingReturnToOverview((shouldReturn) => {
-      if (shouldReturn) setView('overview')
-      return false
-    })
-  }, [sessionId, updateRest, clearRestFn])
+    if (pendingReturnToOverview) {
+      setView('overview')
+      setPendingReturnToOverview(false)
+    }
+  }, [sessionId, updateRest, clearRestFn, pendingReturnToOverview])
 
   const addRestTime = useCallback((extraSeconds: number) => {
     const t = useSession.getState().restTimer

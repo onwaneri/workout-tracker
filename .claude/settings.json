@@ -31,7 +31,8 @@
       "Bash(tar -xzf bundle.tar.gz)",
       "Bash(curl -s http://localhost:5175)",
       "Bash(pkill -f \"vite --port 5175\")",
-      "Bash(xargs ls *)"
+      "Bash(xargs ls *)",
+      "Bash(git commit -am ' *)"
     ]
   }
 }
