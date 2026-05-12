@@ -1,42 +1,46 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { Session } from '@/lib/supabase/database.types'
 import { workoutDaysSet, currentDayStreak, longestDayStreak } from '@/lib/stats/consistency'
 
-function toDateKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+function toDateKey(year: number, month: number, day: number): string {
+  return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
+
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 export function CalendarHeatmap({ sessions }: { sessions: Session[] }) {
   const workoutSet = useMemo(() => workoutDaysSet(sessions), [sessions])
   const streak = useMemo(() => currentDayStreak(workoutSet), [workoutSet])
   const best = useMemo(() => longestDayStreak(workoutSet), [workoutSet])
 
-  // Build 13-week grid (most recent week on the right)
-  const cells = useMemo(() => {
-    const today = new Date()
-    const result: { date: Date; key: string }[][] = []
-    // Sunday of 13 weeks ago
-    const startDate = new Date(today)
-    startDate.setDate(today.getDate() - today.getDay() - 13 * 7)
+  const now = new Date()
+  const [viewYear, setViewYear] = useState(now.getFullYear())
+  const [viewMonth, setViewMonth] = useState(now.getMonth())
 
-    for (let w = 0; w < 13; w++) {
-      const week: { date: Date; key: string }[] = []
-      for (let d = 0; d < 7; d++) {
-        const date = new Date(startDate)
-        date.setDate(startDate.getDate() + w * 7 + d)
-        week.push({ date, key: toDateKey(date) })
-      }
-      result.push(week)
-    }
-    return result
-  }, [])
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate()
+  const todayKey = toDateKey(now.getFullYear(), now.getMonth(), now.getDate())
 
-  const todayKey = toDateKey(new Date())
+  function prevMonth() {
+    if (viewMonth === 0) { setViewYear(y => y - 1); setViewMonth(11) }
+    else setViewMonth(m => m - 1)
+  }
+  function nextMonth() {
+    if (viewMonth === 11) { setViewYear(y => y + 1); setViewMonth(0) }
+    else setViewMonth(m => m + 1)
+  }
+
+  const isCurrentMonth = viewYear === now.getFullYear() && viewMonth === now.getMonth()
+  const isFutureMonth =
+    viewYear > now.getFullYear() ||
+    (viewYear === now.getFullYear() && viewMonth > now.getMonth())
 
   return (
     <section>
       {/* Streak chips */}
-      <div style={{ display: 'flex', gap: 20, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 20, marginBottom: 20 }}>
         <div>
           <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)' }}>
             Streak
@@ -55,45 +59,75 @@ export function CalendarHeatmap({ sessions }: { sessions: Session[] }) {
         </div>
       </div>
 
-      {/* 13-week grid: columns = weeks, rows = days */}
-      <div style={{ display: 'grid', gridTemplateColumns: `repeat(13, 1fr)`, gap: 4 }}>
-        {cells.map((week, wi) => (
-          <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {week.map(({ date, key }) => {
-              const worked = workoutSet.has(key)
-              const isToday = key === todayKey
-              const isFuture = date.getTime() > Date.now() + 86400000
-
-              return (
-                <div
-                  key={key}
-                  style={{
-                    aspectRatio: '1',
-                    borderRadius: 3,
-                    background: worked
-                      ? 'var(--color-accent)'
-                      : isToday
-                        ? 'var(--color-surface-hi)'
-                        : isFuture
-                          ? 'var(--color-surface)'
-                          : 'var(--color-surface)',
-                    opacity: worked ? 0.85 : isFuture ? 0.3 : 0.6,
-                    outline: isToday ? '1px solid var(--color-accent-dim)' : 'none',
-                  }}
-                />
-              )
-            })}
-          </div>
-        ))}
+      {/* Month navigation header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <button
+          onClick={prevMonth}
+          style={{
+            background: 'none', border: 'none', color: 'var(--color-muted)',
+            cursor: 'pointer', padding: '4px 8px', minHeight: 36, fontSize: 16,
+            display: 'flex', alignItems: 'center',
+          }}
+          aria-label="Previous month"
+        >
+          ‹
+        </button>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--color-text)' }}>
+          {MONTH_NAMES[viewMonth]} {viewYear}
+        </span>
+        <button
+          onClick={nextMonth}
+          disabled={isFutureMonth}
+          style={{
+            background: 'none', border: 'none',
+            color: isFutureMonth ? 'var(--color-border)' : 'var(--color-muted)',
+            cursor: isFutureMonth ? 'default' : 'pointer',
+            padding: '4px 8px', minHeight: 36, fontSize: 16,
+            display: 'flex', alignItems: 'center',
+          }}
+          aria-label="Next month"
+        >
+          ›
+        </button>
       </div>
 
-      {/* Legend */}
-      <div style={{ display: 'flex', gap: 8, marginTop: 10, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)', alignItems: 'center' }}>
-        <span>less</span>
-        {[0.15, 0.4, 0.65, 0.85].map((o, i) => (
-          <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--color-accent)', opacity: o }} />
-        ))}
-        <span>more</span>
+      {/* Day grid: 7 columns, days 1-N in order */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 6 }}>
+        {Array.from({ length: daysInMonth }, (_, i) => {
+          const day = i + 1
+          const key = toDateKey(viewYear, viewMonth, day)
+          const worked = workoutSet.has(key)
+          const isToday = key === todayKey
+          const isFutureDay =
+            isFutureMonth ||
+            (isCurrentMonth && day > now.getDate())
+
+          return (
+            <div
+              key={day}
+              style={{
+                aspectRatio: '1',
+                borderRadius: 6,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: 'var(--font-mono)', fontSize: 11,
+                fontFeatureSettings: '"tnum"',
+                background: worked
+                  ? 'var(--color-accent)'
+                  : 'var(--color-surface)',
+                color: worked
+                  ? 'var(--color-accent-ink)'
+                  : isToday
+                    ? 'var(--color-text)'
+                    : 'var(--color-muted)',
+                opacity: isFutureDay ? 0.35 : 1,
+                outline: isToday && !worked ? '1px solid var(--color-accent-dim)' : 'none',
+                fontWeight: isToday ? 600 : 400,
+              }}
+            >
+              {day}
+            </div>
+          )
+        })}
       </div>
     </section>
   )
