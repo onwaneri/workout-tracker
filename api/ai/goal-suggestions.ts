@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
+import { goalSuggestionsResponseSchema } from '../../src/lib/ai/schemas.js'
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
 const RATE_LIMIT = 20
@@ -111,7 +112,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [
+        { role: 'user', content: userMessage },
+        { role: 'assistant', content: '{' },
+      ],
     })
 
     const textBlock = response.content.find((b) => b.type === 'text')
@@ -119,21 +123,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No text response from AI' })
     }
 
-    // Extract the first JSON object from the response — handles markdown fences,
-    // leading prose, trailing text, etc.
-    const jsonMatch = textBlock.text.match(/\{[\s\S]*\}/)
-    if (!jsonMatch) {
-      return res.status(502).json({ error: 'AI returned no JSON object', raw: textBlock.text })
-    }
-
+    const jsonText = '{' + textBlock.text
     let parsed: unknown
     try {
-      parsed = JSON.parse(jsonMatch[0])
-    } catch {
-      return res.status(502).json({ error: 'AI returned invalid JSON', raw: textBlock.text })
+      parsed = JSON.parse(jsonText)
+    } catch (parseErr) {
+      console.error('[goal-suggestions] AI returned invalid JSON:', jsonText.slice(0, 500))
+      return res.status(502).json({ error: 'AI returned invalid JSON' })
     }
 
-    return res.status(200).json(parsed)
+    const validated = goalSuggestionsResponseSchema.safeParse(parsed)
+    if (!validated.success) {
+      return res.status(502).json({
+        error: 'AI returned invalid goal structure',
+        details: validated.error.flatten(),
+      })
+    }
+
+    return res.status(200).json(validated.data)
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Unknown error'
     return res.status(502).json({ error: `AI request failed: ${message}` })

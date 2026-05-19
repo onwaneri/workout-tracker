@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from './sessionStore'
 import { useExercises, useAllExercises } from '@/lib/queries/exercises'
 import {
@@ -84,9 +84,12 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     [exercises.data],
   )
 
-  // Auto-advance to first incomplete exercise when data loads
+  // Auto-position to first incomplete exercise on initial data load only
+  const didInitialPosition = useRef(false)
   useEffect(() => {
+    if (didInitialPosition.current) return
     if (!sortedExercises.length || !sets.data) return
+    didInitialPosition.current = true
     const skippedIds = new Set(sets.data.filter((s) => s.is_skipped).map((s) => s.exercise_id))
     const setsByEx = new Map<string, number>()
     for (const s of sets.data) {
