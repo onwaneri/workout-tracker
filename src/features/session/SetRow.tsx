@@ -113,11 +113,13 @@ export function SetRow({
   setNumber,
   prefill,
   bodyweight,
+  target,
   onLog,
 }: {
   setNumber: number
   prefill?: SetPrefill | null
   bodyweight?: number | null
+  target?: { weight: number | null; reps: number | null } | null
   onLog: (s: { weight: number | null; reps: number | null; rpe: number | null; isWarmup: boolean; note: string | null }) => void
 }) {
   const [d, setD] = useState<SetDraft>(() =>
@@ -153,6 +155,28 @@ export function SetRow({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Target indicator */}
+      {target && (target.weight != null || target.reps != null) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '6px 12px', borderRadius: 10,
+          background: 'var(--color-accent-soft)',
+          border: '1px solid color-mix(in srgb, var(--color-accent) 25%, transparent)',
+        }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em',
+            textTransform: 'uppercase', color: 'var(--color-accent)', flexShrink: 0,
+          }}>
+            Target
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
+            color: 'var(--color-text)', fontFeatureSettings: '"tnum"',
+          }}>
+            {target.weight != null ? `${target.weight} lb` : 'BW'} {'\u00d7'} {target.reps ?? '—'}
+          </span>
+        </div>
+      )}
       {/* Number fields */}
       <div style={{ display: 'flex', gap: 12 }}>
         {bodyweight != null ? (

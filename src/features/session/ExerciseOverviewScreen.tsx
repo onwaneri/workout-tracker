@@ -1,5 +1,6 @@
 import { fmtDuration } from '@/lib/format'
 import type { Exercise } from '@/lib/supabase/database.types'
+import type { ExerciseTarget } from '@/lib/stats/targets'
 
 function ChevronIcon() {
   return (
@@ -30,6 +31,7 @@ export function ExerciseOverviewScreen({
   setsByExercise,
   skippedIds,
   swapMap,
+  targetByExercise,
   elapsed,
   totalSetsLogged,
   onSelectExercise,
@@ -43,6 +45,7 @@ export function ExerciseOverviewScreen({
   setsByExercise: Map<string, number>
   skippedIds: Set<string>
   swapMap: Map<string, { name: string; muscle_group: string; type: string }>
+  targetByExercise?: Map<string, ExerciseTarget>
   elapsed: number
   totalSetsLogged: number
   onSelectExercise: (idx: number) => void
@@ -158,6 +161,15 @@ export function ExerciseOverviewScreen({
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-muted)', marginTop: 4 }}>
                     {skipped ? 'skipped' : `${logged} / ${e.default_sets} sets`}
                   </div>
+                  {(() => {
+                    const t = targetByExercise?.get(e.id)
+                    if (!t) return null
+                    return (
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-faint)', marginTop: 3 }}>
+                        Target: {t.weight != null ? t.weight : 'BW'} {'\u00d7'} {t.reps ?? '—'}
+                      </div>
+                    )
+                  })()}
                 </div>
 
                 <div style={{ color: done ? 'var(--color-accent)' : 'var(--color-muted)', flexShrink: 0 }}>

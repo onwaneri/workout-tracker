@@ -20,6 +20,9 @@ import { ExerciseSwapSheet } from './ExerciseSwapSheet'
 import { ExerciseOverviewScreen } from './ExerciseOverviewScreen'
 import { fmtDuration } from '@/lib/format'
 import { BODYWEIGHT_LBS, isBodyweightExercise } from '@/lib/constants'
+import { resolveTarget } from '@/lib/stats/targets'
+import type { ExerciseTarget } from '@/lib/stats/targets'
+import { useTargetOverrides } from '@/features/goals/targetOverrideStore'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import type { Exercise } from '@/lib/supabase/database.types'
 import type { SwapSuggestion } from '@/lib/ai/schemas'
@@ -66,6 +69,8 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   const sets = useSessionSets(sessionId ?? undefined)
   const swaps = useSessionSwaps(sessionId ?? undefined)
   const createSwap = useCreateSwap()
+
+  const overrides = useTargetOverrides((s) => s.overrides)
 
   const endSession = useEndSession()
   const logSet = useLogSet()
@@ -163,6 +168,22 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     }
     return m
   }, [sets.data, lastSets.data, swapMatchedIds])
+
+  const targetByExercise = useMemo(() => {
+    const m = new Map<string, ExerciseTarget>()
+    const last = lastSets.data ?? {}
+    for (const e of sortedExercises) {
+      const displayName = swapMap.get(e.id)?.name ?? e.name
+      const lastSet = last[e.id]
+      const t = resolveTarget(
+        displayName,
+        lastSet ? { weight: lastSet.weight, reps: lastSet.reps, rpe: lastSet.rpe, logged_at: lastSet.logged_at } : null,
+        overrides,
+      )
+      if (t) m.set(e.id, t)
+    }
+    return m
+  }, [sortedExercises, lastSets.data, swapMap, overrides])
 
   const handleSwapConfirm = async (suggestion: SwapSuggestion, matchedExerciseId: string | null) => {
     if (!swapTarget || !sessionId) return
@@ -285,6 +306,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
         setsByExercise={setsByExercise}
         skippedIds={skippedIds}
         swapMap={swapMap}
+        targetByExercise={targetByExercise}
         elapsed={elapsed}
         totalSetsLogged={totalSetsLogged}
         onSelectExercise={(idx) => { setCurrentExIdx(idx); setView('detail') }}
@@ -405,6 +427,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
                 setNumber={currentSetNum}
                 prefill={prefillByExercise.get(currentEx.id) ?? null}
                 bodyweight={isBodyweightExercise(displayName) ? BODYWEIGHT_LBS : null}
+                target={targetByExercise.get(currentEx.id) ?? null}
                 onLog={(p) => onLogSet(currentEx, p)}
               />
             )}

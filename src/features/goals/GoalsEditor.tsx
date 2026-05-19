@@ -1,30 +1,23 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button } from '@/components/Button'
+import { useMemo, useState } from 'react'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
-import { useGoals, useUpsertExerciseGoal, useBulkUpsertGoals } from '@/lib/queries/goals'
 import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
 import { requestGoalSuggestions } from '@/lib/ai/client'
 import type { GoalSuggestionsPayload } from '@/lib/ai/client'
+import { computeNextTarget } from '@/lib/stats/targets'
+import type { ExerciseTarget } from '@/lib/stats/targets'
+import { useTargetOverrides } from './targetOverrideStore'
 import { fmtWeight } from '@/lib/format'
 
-const SMALLEST_PLATE_LB = 2.5
 const RECENT_SETS_LIMIT = 5
 
 type ExerciseHead = { id: string; name: string; muscle_group: string; type: string }
 
 export function GoalsEditor() {
   const allEx = useAllExercises()
-  const goals = useGoals()
-  const upsertExGoal = useUpsertExerciseGoal()
-  const bulkUpsert = useBulkUpsertGoals()
   const pv = useActivePlanVersion()
   const days = useWorkoutDays(pv.data?.id)
-
-  const [aiLoading, setAiLoading] = useState(false)
-  const [aiError, setAiError] = useState<string | null>(null)
-  const aiTriggeredRef = useRef(false)
 
   const activeDayIds = useMemo(
     () => new Set((days.data ?? []).map((d) => d.id)),
@@ -44,7 +37,6 @@ export function GoalsEditor() {
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
   }, [allEx.data, activeDayIds])
 
-  // Collect all exercise IDs for a single history fetch
   const allLineageIds = useMemo(() => {
     if (!allEx.data || exerciseHeads.length === 0) return [] as string[]
     const ids: string[] = []
@@ -56,206 +48,282 @@ export function GoalsEditor() {
 
   const allHistory = useExerciseHistory(allLineageIds)
 
-  // Build per-exercise recent sets map for AI
-  const recentSetsMap = useMemo(() => {
-    if (!allHistory.data || !allEx.data) return new Map<string, GoalSuggestionsPayload['exercises'][number]['recentSets']>()
-    const map = new Map<string, GoalSuggestionsPayload['exercises'][number]['recentSets']>()
+  // Per-exercise: last top set + recent sets for AI
+  const exerciseData = useMemo(() => {
+    if (!allHistory.data || !allEx.data) return new Map<string, { lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null; recentSets: GoalSuggestionsPayload['exercises'][number]['recentSets'] }>()
+    const map = new Map<string, { lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null; recentSets: GoalSuggestionsPayload['exercises'][number]['recentSets'] }>()
     for (const head of exerciseHeads) {
       const lineage = new Set(resolveExerciseLineage(head.id, allEx.data))
-      const sets = allHistory.data
+      const working = allHistory.data
         .filter((s) => lineage.has(s.exercise_id) && !s.is_warmup && !s.is_skipped)
+      const recentSets = working
         .slice(0, RECENT_SETS_LIMIT)
         .map((s) => ({ weight: s.weight, reps: s.reps, rpe: s.rpe, logged_at: s.logged_at }))
-      map.set(head.id, sets)
+      // Last top set: most recent session's highest-weight working set
+      const withWeight = working.filter((s) => s.weight != null && s.reps != null)
+      let lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null = null
+      if (withWeight.length > 0) {
+        const newestSession = withWeight.filter((s) => s.session_id === withWeight[0].session_id)
+        const best = newestSession.reduce(
+          (b, s) => (s.weight! > (b?.weight ?? -Infinity) ? s : b),
+          null as null | (typeof withWeight)[number],
+        )
+        if (best) lastTopSet = { weight: best.weight, reps: best.reps, rpe: best.rpe, logged_at: best.logged_at }
+      } else if (working.length > 0) {
+        // Bodyweight exercises (no weight)
+        const s = working[0]
+        lastTopSet = { weight: s.weight, reps: s.reps, rpe: s.rpe, logged_at: s.logged_at }
+      }
+      map.set(head.id, { lastTopSet, recentSets })
     }
     return map
   }, [allHistory.data, allEx.data, exerciseHeads])
 
-  const generateGoals = useCallback(
-    async (exercises: ExerciseHead[]) => {
-      setAiLoading(true)
-      setAiError(null)
-      try {
-        const payload: GoalSuggestionsPayload = {
-          exercises: exercises.map((e) => ({
-            name: e.name,
-            muscle_group: e.muscle_group,
-            type: e.type,
-            recentSets: recentSetsMap.get(e.id) ?? [],
-          })),
-        }
-        const result = await requestGoalSuggestions(payload)
-        const nameToId = new Map(exercises.map((e) => [e.name, e.id]))
-        const upserts = result.suggestions
-          .filter((s) => nameToId.has(s.exercise_name))
-          .map((s) => ({
-            exercise_id: nameToId.get(s.exercise_name)!,
-            target_weight: s.target_weight,
-            target_reps: s.target_reps,
-          }))
-        if (upserts.length > 0) {
-          bulkUpsert.mutate(upserts)
-        }
-      } catch (err) {
-        setAiError(err instanceof Error ? err.message : 'AI goal generation failed')
-      } finally {
-        setAiLoading(false)
-      }
-    },
-    [recentSetsMap, bulkUpsert],
-  )
-
-  // Auto-trigger AI for exercises missing goals
-  useEffect(() => {
-    if (!isAiFeaturesEnabled() || !navigator.onLine) return
-    if (!exerciseHeads.length || aiLoading || aiTriggeredRef.current) return
-    if (!allHistory.data) return // wait for history to load
-    const existingGoalIds = new Set((goals.data ?? []).filter((g) => g.exercise_id).map((g) => g.exercise_id))
-    const missing = exerciseHeads.filter((e) => !existingGoalIds.has(e.id))
-    if (missing.length === 0) return
-    aiTriggeredRef.current = true
-    generateGoals(exerciseHeads)
-  }, [exerciseHeads, goals.data, allHistory.data, aiLoading, generateGoals])
-
-  // Reset trigger ref when active plan changes
-  useEffect(() => {
-    aiTriggeredRef.current = false
-  }, [pv.data?.id])
+  if (!exerciseHeads.length) {
+    return <p style={{ fontSize: 13, color: 'var(--color-muted)' }}>No exercises in active plan.</p>
+  }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs uppercase tracking-wide text-[color:var(--color-muted)]">Per exercise</h3>
-          {isAiFeaturesEnabled() && (
-            <Button
-              variant="secondary"
-              onClick={() => generateGoals(exerciseHeads)}
-              disabled={aiLoading || exerciseHeads.length === 0}
-            >
-              {aiLoading ? 'Generating...' : 'Refresh goals'}
-            </Button>
-          )}
-        </div>
-        {aiError && (
-          <p className="text-xs text-red-400 mb-2">{aiError}</p>
-        )}
-        {aiLoading && (
-          <div className="space-y-2 mb-2">
-            {exerciseHeads.map((e) => (
-              <div
-                key={e.id}
-                className="h-12 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] animate-pulse"
-              />
-            ))}
-          </div>
-        )}
-        {!aiLoading && (
-          <ul className="space-y-2">
-            {exerciseHeads.map((e) => (
-              <ExerciseGoalRow
-                key={e.id}
-                exerciseId={e.id}
-                name={e.name}
-                goal={(goals.data ?? []).find((g) => g.exercise_id === e.id) ?? null}
-                onSave={(target_weight, target_reps) =>
-                  upsertExGoal.mutate({ exercise_id: e.id, target_weight, target_reps })
-                }
-              />
-            ))}
-          </ul>
-        )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--color-muted)', marginBottom: 4 }}>
+        Per exercise targets
       </div>
+      {exerciseHeads.map((e) => (
+        <ExerciseTargetRow
+          key={e.id}
+          exercise={e}
+          data={exerciseData.get(e.id) ?? { lastTopSet: null, recentSets: [] }}
+        />
+      ))}
     </div>
   )
 }
 
-function ExerciseGoalRow({
-  exerciseId,
-  name,
-  goal,
-  onSave,
+function ExerciseTargetRow({
+  exercise,
+  data,
 }: {
-  exerciseId: string
-  name: string
-  goal: { target_weight: number | null; target_reps: number | null } | null
-  onSave: (w: number | null, r: number | null) => void
+  exercise: ExerciseHead
+  data: {
+    lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null
+    recentSets: GoalSuggestionsPayload['exercises'][number]['recentSets']
+  }
 }) {
-  const allEx = useAllExercises()
-  const lineage = useMemo(
-    () => (allEx.data ? resolveExerciseLineage(exerciseId, allEx.data) : []),
-    [allEx.data, exerciseId],
-  )
-  const history = useExerciseHistory(lineage)
+  const overrides = useTargetOverrides((s) => s.overrides)
+  const setOverride = useTargetOverrides((s) => s.setOverride)
+  const clearOverride = useTargetOverrides((s) => s.clearOverride)
 
-  const lastTopSet = useMemo(() => {
-    if (!history.data) return null
-    const working = history.data.filter((s) => !s.is_warmup && !s.is_skipped && s.weight != null && s.reps != null)
-    if (working.length === 0) return null
-    // Most recent session: take the highest-weight set from the most recent logged_at date
-    const newestDate = working[0].logged_at
-    const newestSession = working.filter((s) => s.logged_at === newestDate || s.session_id === working[0].session_id)
-    return newestSession.reduce(
-      (best, s) => (s.weight! > (best?.weight ?? -Infinity) ? s : best),
-      null as null | (typeof working)[number],
-    )
-  }, [history.data])
+  const [editing, setEditing] = useState(false)
+  const [editW, setEditW] = useState('')
+  const [editR, setEditR] = useState('')
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
-  const suggested =
-    goal?.target_weight == null && lastTopSet
-      ? { weight: (lastTopSet.weight ?? 0) + SMALLEST_PLATE_LB, reps: lastTopSet.reps ?? 0 }
-      : null
+  const key = exercise.name.trim().toLowerCase()
+  const override = overrides[key]
+  const overrideFresh = override && (!data.lastTopSet || override.createdAt > new Date(data.lastTopSet.logged_at).getTime())
 
-  const [w, setW] = useState<string>(goal?.target_weight?.toString() ?? '')
-  const [r, setR] = useState<string>(goal?.target_reps?.toString() ?? '')
+  const computed: ExerciseTarget | null = computeNextTarget(data.lastTopSet)
 
-  // Sync local state when goal changes (e.g. from AI bulk upsert)
-  useEffect(() => {
-    if (goal?.target_weight != null) setW(goal.target_weight.toString())
-    if (goal?.target_reps != null) setR(goal.target_reps.toString())
-  }, [goal?.target_weight, goal?.target_reps])
+  const effective: ExerciseTarget | null = overrideFresh
+    ? { weight: override.weight, reps: override.reps, basis: 'override' }
+    : computed
+
+  const startEdit = () => {
+    const base = effective ?? { weight: null, reps: null }
+    setEditW(base.weight != null ? String(base.weight) : '')
+    setEditR(base.reps != null ? String(base.reps) : '')
+    setEditing(true)
+  }
+
+  const saveEdit = () => {
+    setOverride(exercise.name, {
+      weight: editW === '' ? null : Number(editW),
+      reps: editR === '' ? null : Number(editR),
+      source: 'manual',
+    })
+    setEditing(false)
+  }
+
+  const handleAiAdvice = async () => {
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const payload: GoalSuggestionsPayload = {
+        exercises: [{
+          name: exercise.name,
+          muscle_group: exercise.muscle_group,
+          type: exercise.type,
+          recentSets: data.recentSets,
+        }],
+      }
+      const result = await requestGoalSuggestions(payload)
+      const suggestion = result.suggestions.find(
+        (s) => s.exercise_name.toLowerCase() === exercise.name.toLowerCase(),
+      ) ?? result.suggestions[0]
+      if (suggestion) {
+        setOverride(exercise.name, {
+          weight: suggestion.target_weight,
+          reps: suggestion.target_reps,
+          source: 'ai',
+        })
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : 'AI request failed')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   return (
-    <li className="flex flex-wrap items-center gap-2 rounded-lg border border-[color:var(--color-border)] bg-[color:var(--color-bg)] p-2">
-      <div className="flex-1 min-w-0">
-        <div className="text-sm">{name}</div>
-        {lastTopSet && (
-          <div className="text-[10px] text-[color:var(--color-muted)]">
-            Last: {fmtWeight(lastTopSet.weight)} × {lastTopSet.reps}
-          </div>
+    <div style={{
+      padding: '12px 14px', borderRadius: 12,
+      border: '1px solid var(--color-border)',
+      background: 'var(--color-bg)',
+      display: 'flex', flexDirection: 'column', gap: 6,
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 14, fontWeight: 500 }}>{exercise.name}</div>
+          {data.lastTopSet && (
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)', marginTop: 2 }}>
+              Last: {fmtWeight(data.lastTopSet.weight)} {'\u00d7'} {data.lastTopSet.reps ?? '—'}
+              {data.lastTopSet.rpe != null && ` @ RPE ${data.lastTopSet.rpe}`}
+            </div>
+          )}
+        </div>
+        {overrideFresh && (
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9, letterSpacing: '0.08em',
+            textTransform: 'uppercase', padding: '2px 6px', borderRadius: 6,
+            background: override.source === 'ai' ? 'rgba(168,85,247,0.15)' : 'rgba(59,130,246,0.15)',
+            color: override.source === 'ai' ? '#c084fc' : '#60a5fa',
+          }}>
+            {override.source}
+          </span>
         )}
       </div>
-      <input
-        inputMode="decimal"
-        placeholder="Weight"
-        value={w}
-        onChange={(e) => setW(e.target.value)}
-        className="w-20 bg-transparent text-sm focus:outline-none border-b border-[color:var(--color-border)] py-1"
-      />
-      <input
-        inputMode="numeric"
-        placeholder="Reps"
-        value={r}
-        onChange={(e) => setR(e.target.value)}
-        className="w-16 bg-transparent text-sm focus:outline-none border-b border-[color:var(--color-border)] py-1"
-      />
-      {suggested && (
-        <button
-          className="text-[10px] text-[color:var(--color-accent)] underline"
-          onClick={() => {
-            setW(String(suggested.weight))
-            setR(String(suggested.reps))
-          }}
-        >
-          {fmtWeight(suggested.weight)}×{suggested.reps}
-        </button>
+
+      {/* Target display */}
+      {effective ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--color-accent)' }}>
+            Target
+          </span>
+          <button
+            onClick={startEdit}
+            style={{
+              fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500,
+              color: 'var(--color-text)', background: 'none', border: 'none',
+              cursor: 'pointer', padding: 0, textDecoration: 'underline',
+              textDecorationColor: 'var(--color-border)', textUnderlineOffset: 3,
+            }}
+          >
+            {effective.weight != null ? `${effective.weight} lb` : 'BW'} {'\u00d7'} {effective.reps ?? '—'}
+          </button>
+          {effective.basis !== 'override' && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9, color: 'var(--color-faint)', textTransform: 'uppercase' }}>
+              {effective.basis === 'progression' ? '+wt' : effective.basis === 'hold' ? '+rep' : 'same'}
+            </span>
+          )}
+        </div>
+      ) : (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--color-faint)' }}>
+          No history yet
+        </div>
       )}
-      <Button
-        variant="secondary"
-        onClick={() => onSave(w === '' ? null : Number(w), r === '' ? null : Number(r))}
-      >
-        Save
-      </Button>
-    </li>
+
+      {/* Inline edit */}
+      {editing && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+          <input
+            inputMode="decimal"
+            placeholder="Weight"
+            value={editW}
+            onChange={(e) => setEditW(e.target.value)}
+            style={{
+              width: 72, padding: '6px 8px', borderRadius: 8,
+              border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+              color: 'var(--color-text)', fontFamily: 'var(--font-mono)', fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          <span style={{ color: 'var(--color-muted)', fontSize: 12 }}>{'\u00d7'}</span>
+          <input
+            inputMode="numeric"
+            placeholder="Reps"
+            value={editR}
+            onChange={(e) => setEditR(e.target.value)}
+            style={{
+              width: 56, padding: '6px 8px', borderRadius: 8,
+              border: '1px solid var(--color-border)', background: 'var(--color-surface)',
+              color: 'var(--color-text)', fontFamily: 'var(--font-mono)', fontSize: 13,
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={saveEdit}
+            style={{
+              padding: '6px 12px', borderRadius: 8, border: 'none',
+              background: 'var(--color-accent)', color: 'var(--color-accent-ink)',
+              fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 600,
+              cursor: 'pointer', minHeight: 32,
+            }}
+          >
+            Set
+          </button>
+          <button
+            onClick={() => setEditing(false)}
+            style={{
+              padding: '6px 10px', borderRadius: 8,
+              border: '1px solid var(--color-border)', background: 'transparent',
+              color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontSize: 11,
+              cursor: 'pointer', minHeight: 32,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Action buttons */}
+      {!editing && (
+        <div style={{ display: 'flex', gap: 8, marginTop: 2 }}>
+          {isAiFeaturesEnabled() && (
+            <button
+              onClick={handleAiAdvice}
+              disabled={aiLoading}
+              style={{
+                padding: '4px 10px', borderRadius: 6,
+                border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)',
+                color: '#c084fc', fontFamily: 'var(--font-mono)', fontSize: 10,
+                cursor: 'pointer', opacity: aiLoading ? 0.5 : 1,
+              }}
+            >
+              {aiLoading ? 'Thinking...' : 'AI advice'}
+            </button>
+          )}
+          {overrideFresh && (
+            <button
+              onClick={() => clearOverride(exercise.name)}
+              style={{
+                padding: '4px 10px', borderRadius: 6,
+                border: '1px solid var(--color-border)', background: 'transparent',
+                color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', fontSize: 10,
+                cursor: 'pointer',
+              }}
+            >
+              Clear override
+            </button>
+          )}
+        </div>
+      )}
+
+      {aiError && (
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: '#f87171', marginTop: 2 }}>
+          {aiError}
+        </div>
+      )}
+    </div>
   )
 }
