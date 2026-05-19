@@ -112,10 +112,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [
-        { role: 'user', content: userMessage },
-        { role: 'assistant', content: '{' },
-      ],
+      messages: [{ role: 'user', content: userMessage }],
     })
 
     const textBlock = response.content.find((b) => b.type === 'text')
@@ -123,12 +120,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(500).json({ error: 'No text response from AI' })
     }
 
-    const jsonText = '{' + textBlock.text
     let parsed: unknown
     try {
-      parsed = JSON.parse(jsonText)
+      parsed = JSON.parse(textBlock.text)
     } catch (parseErr) {
-      console.error('[goal-suggestions] AI returned invalid JSON:', jsonText.slice(0, 500))
+      console.error('[goal-suggestions] AI returned invalid JSON:', textBlock.text.slice(0, 500))
       return res.status(502).json({ error: 'AI returned invalid JSON' })
     }
 
