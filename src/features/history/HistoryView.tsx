@@ -2,6 +2,7 @@ import { lazy, Suspense, useMemo, useState } from 'react'
 import { Screen } from '@/components/Screen'
 import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
+import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
 import { fmtDate, fmtDuration, fmtWeight } from '@/lib/format'
 import { avgRestMs, totalRestMs } from '@/lib/stats/rest'
 import { PastSessionsList } from './PastSessionsList'
@@ -21,13 +22,53 @@ function ArrowIcon() {
   )
 }
 
+function SectionLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em',
+      textTransform: 'uppercase', color: 'var(--color-muted)',
+      paddingTop: 20, paddingBottom: 10,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function ExerciseRow({ group, first, onSelect }: { group: HistoryGroup; first: boolean; onSelect: () => void }) {
+  return (
+    <button
+      onClick={onSelect}
+      style={{
+        display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+        padding: '16px 0',
+        borderTop: first ? '1px solid var(--color-border)' : 'none',
+        borderBottom: '1px solid var(--color-border)',
+        borderLeft: 'none', borderRight: 'none',
+        background: 'transparent',
+        cursor: 'pointer', textAlign: 'left', width: '100%',
+      }}
+    >
+      <span style={{ fontWeight: 500, fontSize: 15 }}>{group.name}</span>
+      <span style={{ color: 'var(--color-muted)' }}><ArrowIcon /></span>
+    </button>
+  )
+}
+
 export function HistoryView() {
   const allEx = useAllExercises()
+  const pv = useActivePlanVersion()
+  const days = useWorkoutDays(pv.data?.id)
   const [selectedGroup, setSelectedGroup] = useState<HistoryGroup | null>(null)
   const [tab, setTab] = useState<Tab>('sessions')
 
-  const latestByLogicalName = useMemo(() => {
-    if (!allEx.data) return []
+  const currentPlanExerciseIds = useMemo(() => {
+    if (!allEx.data || !days.data) return new Set<string>()
+    const dayIds = new Set(days.data.map((d) => d.id))
+    return new Set(allEx.data.filter((e) => dayIds.has(e.workout_day_id)).map((e) => e.id))
+  }, [allEx.data, days.data])
+
+  const { activeGroups, inactiveGroups } = useMemo(() => {
+    if (!allEx.data) return { activeGroups: [], inactiveGroups: [] }
     const lineageCache = new Map<string, string[]>()
     const getLineage = (id: string) => {
       if (!lineageCache.has(id)) lineageCache.set(id, resolveExerciseLineage(id, allEx.data))
@@ -60,10 +101,21 @@ export function HistoryView() {
         }
       }
     }
-    return Array.from(groupsByName.values())
-      .map((g) => ({ id: g.id, name: g.name, ids: Array.from(g.ids).sort() }))
-      .sort((a, b) => a.name.localeCompare(b.name))
-  }, [allEx.data])
+    const active: HistoryGroup[] = []
+    const inactive: HistoryGroup[] = []
+    for (const g of groupsByName.values()) {
+      const ids = Array.from(g.ids).sort()
+      const isActive = ids.some((id) => currentPlanExerciseIds.has(id))
+      if (isActive) {
+        active.push({ id: g.id, name: g.name, ids })
+      } else {
+        inactive.push({ id: g.id, name: g.name, ids })
+      }
+    }
+    active.sort((a, b) => a.name.localeCompare(b.name))
+    inactive.sort((a, b) => a.name.localeCompare(b.name))
+    return { activeGroups: active, inactiveGroups: inactive }
+  }, [allEx.data, currentPlanExerciseIds])
 
   const hist = useExerciseHistory(selectedGroup?.ids ?? [])
 
@@ -150,29 +202,31 @@ export function HistoryView() {
 
       {tab === 'sessions' ? (
         <PastSessionsList />
-      ) : latestByLogicalName.length === 0 ? (
+      ) : activeGroups.length === 0 && inactiveGroups.length === 0 ? (
         <p style={{ fontSize: 14, color: 'var(--color-muted)' }}>No exercises yet.</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {latestByLogicalName.map((e, i) => (
-            <button
-              key={e.id}
-              onClick={() => setSelectedGroup(e)}
-              style={{
-                display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
-                padding: '16px 0',
-                borderTop: i === 0 ? '1px solid var(--color-border)' : 'none',
-                borderBottom: '1px solid var(--color-border)',
-                borderLeft: 'none', borderRight: 'none',
-                background: 'transparent',
-                cursor: 'pointer', textAlign: 'left', width: '100%',
-              }}
-            >
-              <span style={{ fontWeight: 500, fontSize: 15 }}>{e.name}</span>
-              <span style={{ color: 'var(--color-muted)' }}><ArrowIcon /></span>
-            </button>
-          ))}
-        </div>
+        <>
+          {activeGroups.length > 0 && (
+            <>
+              <SectionLabel>In your plan</SectionLabel>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {activeGroups.map((e, i) => (
+                  <ExerciseRow key={e.id} group={e} first={i === 0} onSelect={() => setSelectedGroup(e)} />
+                ))}
+              </div>
+            </>
+          )}
+          {inactiveGroups.length > 0 && (
+            <>
+              <SectionLabel>Past exercises</SectionLabel>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                {inactiveGroups.map((e, i) => (
+                  <ExerciseRow key={e.id} group={e} first={i === 0} onSelect={() => setSelectedGroup(e)} />
+                ))}
+              </div>
+            </>
+          )}
+        </>
       )}
     </Screen>
   )
