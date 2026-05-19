@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useAllExercises, resolveExerciseLineage } from '@/lib/queries/exercises'
+import { useAllExercises, resolveAllIdsForName } from '@/lib/queries/exercises'
 import { useExerciseHistory } from '@/lib/queries/sessions'
 import { useActivePlanVersion, useWorkoutDays } from '@/lib/queries/plans'
 import { isAiFeaturesEnabled } from '@/lib/ai/featureFlag'
@@ -39,11 +39,11 @@ export function GoalsEditor() {
 
   const allLineageIds = useMemo(() => {
     if (!allEx.data || exerciseHeads.length === 0) return [] as string[]
-    const ids: string[] = []
+    const ids = new Set<string>()
     for (const head of exerciseHeads) {
-      ids.push(...resolveExerciseLineage(head.id, allEx.data))
+      for (const id of resolveAllIdsForName(head.name, allEx.data)) ids.add(id)
     }
-    return [...new Set(ids)]
+    return [...ids]
   }, [allEx.data, exerciseHeads])
 
   const allHistory = useExerciseHistory(allLineageIds)
@@ -53,9 +53,9 @@ export function GoalsEditor() {
     if (!allHistory.data || !allEx.data) return new Map<string, { lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null; recentSets: GoalSuggestionsPayload['exercises'][number]['recentSets'] }>()
     const map = new Map<string, { lastTopSet: { weight: number | null; reps: number | null; rpe: number | null; logged_at: string } | null; recentSets: GoalSuggestionsPayload['exercises'][number]['recentSets'] }>()
     for (const head of exerciseHeads) {
-      const lineage = new Set(resolveExerciseLineage(head.id, allEx.data))
+      const allIds = new Set(resolveAllIdsForName(head.name, allEx.data))
       const working = allHistory.data
-        .filter((s) => lineage.has(s.exercise_id) && !s.is_warmup && !s.is_skipped)
+        .filter((s) => allIds.has(s.exercise_id) && !s.is_warmup && !s.is_skipped)
       const recentSets = working
         .slice(0, RECENT_SETS_LIMIT)
         .map((s) => ({ weight: s.weight, reps: s.reps, rpe: s.rpe, logged_at: s.logged_at }))

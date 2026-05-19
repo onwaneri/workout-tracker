@@ -49,6 +49,23 @@ export function findMatchingExerciseId(name: string, all: Exercise[]): string | 
   return best?.id ?? null
 }
 
+/**
+ * Resolve all exercise IDs that share history with the given name.
+ * Merges lineage chains AND orphaned exercises with the same name (case-insensitive).
+ * This matches the grouping logic in HistoryView.
+ */
+export function resolveAllIdsForName(name: string, all: Exercise[]): string[] {
+  const norm = name.trim().toLowerCase()
+  const ids = new Set<string>()
+  for (const e of all) {
+    if (e.name.trim().toLowerCase() !== norm) continue
+    for (const id of resolveExerciseLineage(e.id, all)) {
+      ids.add(id)
+    }
+  }
+  return Array.from(ids)
+}
+
 // Walks previous_exercise_id chain so renamed/reordered exercises share history.
 // NOTE: This function rebuilds maps on every call. Ensure it's wrapped in useMemo at call sites.
 export function resolveExerciseLineage(targetId: string, all: Exercise[]): string[] {

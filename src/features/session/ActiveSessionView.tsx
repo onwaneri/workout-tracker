@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from './sessionStore'
-import { useExercises, useAllExercises } from '@/lib/queries/exercises'
+import { useExercises, useAllExercises, resolveAllIdsForName } from '@/lib/queries/exercises'
 import {
   useSessionSets,
   useEndSession,
@@ -138,12 +138,17 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
   }, [swaps.data])
 
   const exerciseIds = useMemo(() => {
-    const ids = (exercises.data ?? []).map((e) => e.id)
-    for (const matchedId of swapMatchedIds.values()) {
-      if (!ids.includes(matchedId)) ids.push(matchedId)
+    const ids = new Set((exercises.data ?? []).map((e) => e.id))
+    for (const matchedId of swapMatchedIds.values()) ids.add(matchedId)
+    // Include all name-matched IDs (orphaned exercises) so lastSets finds full history
+    if (allExercisesQuery.data) {
+      for (const e of exercises.data ?? []) {
+        const name = swapMap.get(e.id)?.name ?? e.name
+        for (const id of resolveAllIdsForName(name, allExercisesQuery.data)) ids.add(id)
+      }
     }
-    return ids
-  }, [exercises.data, swapMatchedIds])
+    return [...ids]
+  }, [exercises.data, swapMatchedIds, allExercisesQuery.data, swapMap])
   const lastSets = useLastSetsForExercises(exerciseIds)
 
   const prefillByExercise = useMemo(() => {
@@ -174,16 +179,22 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
     const last = lastSets.data ?? {}
     for (const e of sortedExercises) {
       const displayName = swapMap.get(e.id)?.name ?? e.name
-      const lastSet = last[e.id]
+      // Find the most recent set across all name-matched IDs (handles orphaned exercises)
+      let bestSet: typeof last[string] | undefined
+      const nameIds = allExercisesQuery.data ? resolveAllIdsForName(displayName, allExercisesQuery.data) : [e.id]
+      for (const id of nameIds) {
+        const s = last[id]
+        if (s && (!bestSet || s.logged_at > bestSet.logged_at)) bestSet = s
+      }
       const t = resolveTarget(
         displayName,
-        lastSet ? { weight: lastSet.weight, reps: lastSet.reps, rpe: lastSet.rpe, logged_at: lastSet.logged_at } : null,
+        bestSet ? { weight: bestSet.weight, reps: bestSet.reps, rpe: bestSet.rpe, logged_at: bestSet.logged_at } : null,
         overrides,
       )
       if (t) m.set(e.id, t)
     }
     return m
-  }, [sortedExercises, lastSets.data, swapMap, overrides])
+  }, [sortedExercises, lastSets.data, swapMap, overrides, allExercisesQuery.data])
 
   const handleSwapConfirm = async (suggestion: SwapSuggestion, matchedExerciseId: string | null) => {
     if (!swapTarget || !sessionId) return
