@@ -156,24 +156,27 @@ export const useEndSession = () => {
         if (!data) throw new Error(`Session row not found or not visible after update (id=${input.id})`)
         return data as Session
       } catch (err) {
-        console.error('[useEndSession] Failed to persist ended_at:', err)
+        console.error('[useEndSession] Failed to persist ended_at (id=%s):', input.id, err)
         if (!navigator.onLine || err instanceof TypeError) {
+          // Offline — queue for drain on reconnect and return optimistic data
           await enqueueMutation({ table: 'sessions', op: 'update', payload, filter })
+          const cached =
+            qc.getQueryData<Session>(qk.session(input.id)) ??
+            qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
+          if (cached) return { ...cached, ...payload }
+          return {
+            id: input.id,
+            client_uuid: getClientUuid(),
+            plan_version_id: '',
+            workout_day_id: '',
+            started_at: payload.ended_at,
+            ended_at: payload.ended_at,
+            foreground_ms: payload.foreground_ms,
+            background_ms: payload.background_ms,
+          }
         }
-        const cached =
-          qc.getQueryData<Session>(qk.session(input.id)) ??
-          qc.getQueryData<Session[]>(qk.sessions())?.find((s) => s.id === input.id)
-        if (cached) return { ...cached, ...payload }
-        return {
-          id: input.id,
-          client_uuid: getClientUuid(),
-          plan_version_id: '',
-          workout_day_id: '',
-          started_at: payload.ended_at,
-          ended_at: payload.ended_at,
-          foreground_ms: payload.foreground_ms,
-          background_ms: payload.background_ms,
-        }
+        // Online failure — re-throw so the UI shows the error and the user can retry
+        throw err
       }
     },
     onSuccess: (s) => {
