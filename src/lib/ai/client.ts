@@ -1,7 +1,7 @@
 import { getClientUuid } from '@/lib/supabase/uuid'
 import { aiPlanEditResultSchema, exerciseSwapResponseSchema, sessionInsightsSchema, generatedPlanSchema, goalSuggestionsResponseSchema } from './schemas'
 import type { AiPlanEditResult, ExerciseSwapResponse, SessionInsights, GeneratedPlan, GoalSuggestionsResponse } from './schemas'
-import type { ExerciseType } from '@/lib/supabase/database.types'
+import type { ExerciseType, EquipmentType } from '@/lib/supabase/database.types'
 
 const AI_BASE = '/api/ai'
 const CLIENT_UUID = getClientUuid() // Evaluate once at module load to avoid redundant calls
@@ -37,6 +37,7 @@ export type PlanSnapshot = {
       name: string
       muscle_group: string
       type: ExerciseType
+      equipment: EquipmentType
       default_sets: number
     }>
   }>
@@ -102,6 +103,7 @@ export type GoalSuggestionsPayload = {
     name: string
     muscle_group: string
     type: string
+    equipment: string
     recentSets: Array<{ weight: number | null; reps: number | null; rpe: number | null; logged_at: string }>
   }>
 }

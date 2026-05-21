@@ -47,6 +47,7 @@ export function AiPlanChat({
         name: e.name,
         muscle_group: e.muscle_group,
         type: e.type,
+        equipment: e.equipment,
         default_sets: e.default_sets,
       })),
     })),

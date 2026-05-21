@@ -2,6 +2,7 @@
 // once the migrations are applied to the remote project.
 
 export type ExerciseType = 'compound' | 'isolation'
+export type EquipmentType = 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight'
 
 export type Plan = {
   id: string
@@ -36,6 +37,7 @@ export type Exercise = {
   name: string
   muscle_group: string
   type: ExerciseType
+  equipment: EquipmentType
   order_index: number
   default_sets: number
   previous_exercise_id: string | null
@@ -124,6 +126,7 @@ type ExerciseInsert = {
   name: string
   muscle_group: string
   type: ExerciseType
+  equipment?: EquipmentType
   order_index: number
   default_sets?: number
   previous_exercise_id?: string | null

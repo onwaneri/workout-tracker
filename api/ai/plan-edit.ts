@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
+import { TRAINING_GUIDELINES } from './training-guidelines.js'
 
 // Simple in-memory rate limiting: max 20 requests per minute per client
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -30,15 +31,18 @@ RULES:
 - Preserve the user's existing structure as much as possible.
 - Position indexes are 0-based within each day's exercise list.
 
+${TRAINING_GUIDELINES}
+Use these training science principles to evaluate whether proposed changes maintain a well-structured plan. Warn the user (via a clarification response) if a change would violate these guidelines — e.g., removing the only compound movement for a muscle group, exceeding reasonable volume per session, or adding redundant isolations.
+
 RESPONSE SCHEMAS:
 
 1. Diff response (when you can determine the changes):
 {
   "type": "diff",
   "changes": [
-    { "action": "add", "day_index": 0, "position": 2, "exercise": { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "default_sets": 2 } },
+    { "action": "add", "day_index": 0, "position": 2, "exercise": { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "equipment": "barbell"|"dumbbell"|"machine"|"cable"|"bodyweight", "default_sets": 2 } },
     { "action": "remove", "day_index": 0, "exercise_name": "..." },
-    { "action": "edit", "day_index": 0, "exercise_name": "...", "changes": { "name": "...", "muscle_group": "...", "type": "...", "default_sets": ... } },
+    { "action": "edit", "day_index": 0, "exercise_name": "...", "changes": { "name": "...", "muscle_group": "...", "type": "...", "equipment": "...", "default_sets": ... } },
     { "action": "reorder", "day_index": 0, "exercise_name": "...", "new_position": 3 }
   ],
   "summary": "Brief human-readable description of what changed"

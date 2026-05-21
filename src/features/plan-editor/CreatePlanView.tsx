@@ -102,6 +102,7 @@ export function CreatePlanView() {
             name: e.name,
             muscle_group: e.muscle_group,
             type: e.type,
+            equipment: e.equipment,
             default_sets: e.default_sets,
             prevExerciseId: findMatchingExerciseId(e.name, allExercises.data ?? []),
           })),

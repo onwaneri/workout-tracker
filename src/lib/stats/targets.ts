@@ -19,19 +19,23 @@ type LastSet = {
 
 type LastSetWithTimestamp = LastSet & { logged_at: string }
 
-const WEIGHT_INCREMENT = 2.5
+import type { EquipmentType } from '@/lib/supabase/database.types'
+
+function weightIncrement(equipment?: EquipmentType): number {
+  return equipment === 'dumbbell' ? 5 : 2.5
+}
 
 /**
  * Compute the next target from the most recent working set using
  * deterministic progressive overload rules.
  *
- * - RPE < 9: increase weight by 2.5 lb, keep reps
+ * - RPE < 9: increase weight by increment (5 lb dumbbell, 2.5 lb otherwise), keep reps
  * - RPE 9-10: keep weight, increase reps by 1
  * - No RPE: suggest same weight/reps
  * - Bodyweight (null weight): increase reps only
  * - No history: return null
  */
-export function computeNextTarget(lastSet: LastSet | null): ExerciseTarget | null {
+export function computeNextTarget(lastSet: LastSet | null, equipment?: EquipmentType): ExerciseTarget | null {
   if (!lastSet) return null
 
   const { weight, reps, rpe } = lastSet
@@ -53,7 +57,7 @@ export function computeNextTarget(lastSet: LastSet | null): ExerciseTarget | nul
   // RPE < 9 — room to grow: increase weight
   if (rpe < 9) {
     return {
-      weight: weight + WEIGHT_INCREMENT,
+      weight: weight + weightIncrement(equipment),
       reps,
       basis: 'progression',
     }
@@ -75,6 +79,7 @@ export function resolveTarget(
   exerciseName: string,
   lastSet: LastSetWithTimestamp | null,
   overrides: Record<string, TargetOverride>,
+  equipment?: EquipmentType,
 ): ExerciseTarget | null {
   const key = exerciseName.trim().toLowerCase()
   const override = overrides[key]
@@ -91,5 +96,5 @@ export function resolveTarget(
     }
   }
 
-  return computeNextTarget(lastSet)
+  return computeNextTarget(lastSet, equipment)
 }

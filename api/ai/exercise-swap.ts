@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
+import { TRAINING_GUIDELINES } from './training-guidelines.js'
 
 // Simple in-memory rate limiting: max 20 requests per minute per client
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -29,16 +30,19 @@ Return exactly 3 alternative exercises ranked by suitability. Each alternative s
 
 RULES:
 - Return valid JSON only, no markdown fences.
-- Each suggestion must include name, muscle_group, type (compound/isolation), and a one-sentence rationale.
+- Each suggestion must include name, muscle_group, type (compound/isolation), equipment (barbell/dumbbell/machine/cable/bodyweight), and a one-sentence rationale.
 - Consider the reason: if it's equipment-related, suggest alternatives using different equipment. If it's pain/injury-related, suggest gentler variants.
 - Keep suggestions practical for a typical commercial gym.
+
+${TRAINING_GUIDELINES}
+When suggesting alternatives, prefer swaps that preserve the session's role for that exercise. If swapping a compound, suggest compounds first. If swapping an isolation, suggest isolations that target the same muscle group. Avoid suggesting exercises that would create redundancy with other exercises the user likely has in the same session.
 
 RESPONSE SCHEMA:
 {
   "suggestions": [
-    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "rationale": "..." },
-    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "rationale": "..." },
-    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "rationale": "..." }
+    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "equipment": "barbell"|"dumbbell"|"machine"|"cable"|"bodyweight", "rationale": "..." },
+    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "equipment": "barbell"|"dumbbell"|"machine"|"cable"|"bodyweight", "rationale": "..." },
+    { "name": "...", "muscle_group": "...", "type": "compound"|"isolation", "equipment": "barbell"|"dumbbell"|"machine"|"cable"|"bodyweight", "rationale": "..." }
   ]
 }
 

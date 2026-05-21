@@ -7,12 +7,13 @@ import { requestGoalSuggestions } from '@/lib/ai/client'
 import type { GoalSuggestionsPayload } from '@/lib/ai/client'
 import { computeNextTarget } from '@/lib/stats/targets'
 import type { ExerciseTarget } from '@/lib/stats/targets'
+import type { EquipmentType } from '@/lib/supabase/database.types'
 import { useTargetOverrides } from './targetOverrideStore'
 import { fmtWeight } from '@/lib/format'
 
 const RECENT_SETS_LIMIT = 5
 
-type ExerciseHead = { id: string; name: string; muscle_group: string; type: string }
+type ExerciseHead = { id: string; name: string; muscle_group: string; type: string; equipment: string }
 
 export function GoalsEditor() {
   const allEx = useAllExercises()
@@ -31,7 +32,7 @@ export function GoalsEditor() {
       if (!activeDayIds.has(e.workout_day_id)) continue
       const current = seen.get(e.name)
       if (!current || (allEx.data.find((x) => x.id === current.id)?.created_at ?? '') < e.created_at) {
-        seen.set(e.name, { id: e.id, name: e.name, muscle_group: e.muscle_group, type: e.type })
+        seen.set(e.name, { id: e.id, name: e.name, muscle_group: e.muscle_group, type: e.type, equipment: e.equipment })
       }
     }
     return Array.from(seen.values()).sort((a, b) => a.name.localeCompare(b.name))
@@ -123,7 +124,7 @@ function ExerciseTargetRow({
   const override = overrides[key]
   const overrideFresh = override && (!data.lastTopSet || override.createdAt > new Date(data.lastTopSet.logged_at).getTime())
 
-  const computed: ExerciseTarget | null = computeNextTarget(data.lastTopSet)
+  const computed: ExerciseTarget | null = computeNextTarget(data.lastTopSet, exercise.equipment as EquipmentType)
 
   const effective: ExerciseTarget | null = overrideFresh
     ? { weight: override.weight, reps: override.reps, basis: 'override' }
@@ -154,6 +155,7 @@ function ExerciseTargetRow({
           name: exercise.name,
           muscle_group: exercise.muscle_group,
           type: exercise.type,
+          equipment: exercise.equipment,
           recentSets: data.recentSets,
         }],
       }

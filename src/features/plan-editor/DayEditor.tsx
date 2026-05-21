@@ -22,6 +22,7 @@ export function DayEditor({
       name: 'New exercise',
       muscle_group: '',
       type: 'isolation',
+      equipment: 'barbell',
       default_sets: 3,
     }
     update({ exercises: [...day.exercises, next] })
@@ -150,6 +151,27 @@ export function DayEditor({
                     >
                       <option value="compound">Compound</option>
                       <option value="isolation">Isolation</option>
+                    </select>
+                    <select
+                      value={e.equipment}
+                      onChange={(ev) => updateExercise(i, { equipment: ev.target.value as 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight' })}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        outline: 'none',
+                        color: 'var(--color-muted)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        minWidth: 0,
+                        flexShrink: 0,
+                      }}
+                    >
+                      <option value="barbell">Barbell</option>
+                      <option value="dumbbell">Dumbbell</option>
+                      <option value="machine">Machine</option>
+                      <option value="cable">Cable</option>
+                      <option value="bodyweight">Bodyweight</option>
                     </select>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
                       <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--color-muted)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>Sets</span>

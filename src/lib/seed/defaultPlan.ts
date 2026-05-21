@@ -6,21 +6,21 @@ type DayDef =
   | {
       name: string
       isRest?: false
-      exercises: Array<{ name: string; muscleGroup: string; type: 'compound' | 'isolation'; defaultSets?: number }>
+      exercises: Array<{ name: string; muscleGroup: string; type: 'compound' | 'isolation'; equipment: 'barbell' | 'dumbbell' | 'machine' | 'cable' | 'bodyweight'; defaultSets?: number }>
     }
 
 const UPPER: DayDef = {
   name: 'Upper',
   exercises: [
-    { name: 'Incline Smith Machine Bench', muscleGroup: 'Chest / Front Delt', type: 'compound' },
-    { name: 'Skullcrushers', muscleGroup: 'Triceps (long head)', type: 'isolation' },
-    { name: 'Cable Pushdown', muscleGroup: 'Triceps (lateral/medial head)', type: 'isolation' },
-    { name: 'Upright Row Machine', muscleGroup: 'Lateral Delt / Traps', type: 'compound' },
-    { name: 'Pull-Ups', muscleGroup: 'Lats / Back', type: 'compound' },
-    { name: 'Bicep Curl', muscleGroup: 'Biceps', type: 'isolation' },
-    { name: 'Brachialis Curl', muscleGroup: 'Brachialis', type: 'isolation' },
-    { name: 'Lateral Raise', muscleGroup: 'Lateral Delt', type: 'isolation' },
-    { name: 'Rear Delt Fly', muscleGroup: 'Rear Delt', type: 'isolation' },
+    { name: 'Incline Smith Machine Bench', muscleGroup: 'Chest / Front Delt', type: 'compound', equipment: 'machine' },
+    { name: 'Skullcrushers', muscleGroup: 'Triceps (long head)', type: 'isolation', equipment: 'barbell' },
+    { name: 'Cable Pushdown', muscleGroup: 'Triceps (lateral/medial head)', type: 'isolation', equipment: 'cable' },
+    { name: 'Upright Row Machine', muscleGroup: 'Lateral Delt / Traps', type: 'compound', equipment: 'machine' },
+    { name: 'Pull-Ups', muscleGroup: 'Lats / Back', type: 'compound', equipment: 'bodyweight' },
+    { name: 'Bicep Curl', muscleGroup: 'Biceps', type: 'isolation', equipment: 'dumbbell' },
+    { name: 'Brachialis Curl', muscleGroup: 'Brachialis', type: 'isolation', equipment: 'dumbbell' },
+    { name: 'Lateral Raise', muscleGroup: 'Lateral Delt', type: 'isolation', equipment: 'dumbbell' },
+    { name: 'Rear Delt Fly', muscleGroup: 'Rear Delt', type: 'isolation', equipment: 'machine' },
   ],
 }
 
@@ -29,10 +29,10 @@ const DAYS: DayDef[] = [
   {
     name: 'Lower — Quad-Focused',
     exercises: [
-      { name: 'Leg Press', muscleGroup: 'Quads', type: 'compound' },
-      { name: 'Bulgarian Split Squat', muscleGroup: 'Quads / Glutes', type: 'compound' },
-      { name: 'Sumo RDL', muscleGroup: 'Hamstrings / Glutes', type: 'compound' },
-      { name: 'Calf Raise', muscleGroup: 'Calves', type: 'isolation' },
+      { name: 'Leg Press', muscleGroup: 'Quads', type: 'compound', equipment: 'machine' },
+      { name: 'Bulgarian Split Squat', muscleGroup: 'Quads / Glutes', type: 'compound', equipment: 'dumbbell' },
+      { name: 'Sumo RDL', muscleGroup: 'Hamstrings / Glutes', type: 'compound', equipment: 'barbell' },
+      { name: 'Calf Raise', muscleGroup: 'Calves', type: 'isolation', equipment: 'machine' },
     ],
   },
   { name: 'Rest', isRest: true },
@@ -40,11 +40,11 @@ const DAYS: DayDef[] = [
   {
     name: 'Lower — Posterior Chain',
     exercises: [
-      { name: 'RDL', muscleGroup: 'Hamstrings', type: 'compound' },
-      { name: 'Leg Curl', muscleGroup: 'Hamstrings', type: 'isolation' },
-      { name: 'Cable Kickback', muscleGroup: 'Glutes', type: 'isolation' },
-      { name: 'Adductor Machine', muscleGroup: 'Adductors', type: 'isolation' },
-      { name: 'Calf Raise', muscleGroup: 'Calves', type: 'isolation' },
+      { name: 'RDL', muscleGroup: 'Hamstrings', type: 'compound', equipment: 'barbell' },
+      { name: 'Leg Curl', muscleGroup: 'Hamstrings', type: 'isolation', equipment: 'machine' },
+      { name: 'Cable Kickback', muscleGroup: 'Glutes', type: 'isolation', equipment: 'cable' },
+      { name: 'Adductor Machine', muscleGroup: 'Adductors', type: 'isolation', equipment: 'machine' },
+      { name: 'Calf Raise', muscleGroup: 'Calves', type: 'isolation', equipment: 'machine' },
     ],
   },
   { name: 'Rest', isRest: true },
@@ -108,6 +108,7 @@ export async function ensureDefaultPlan(): Promise<{ planId: string; planVersion
       name: e.name,
       muscle_group: e.muscleGroup,
       type: e.type,
+      equipment: e.equipment,
       order_index: idx,
       default_sets: e.defaultSets ?? 2,
     }))

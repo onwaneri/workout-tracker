@@ -23,7 +23,7 @@ const SYSTEM_PROMPT = `You are a strength training coach setting next-session go
 For each exercise, you receive recent performance data (last 3-5 sessions of sets: weight, reps, RPE).
 
 GOAL-SETTING PRINCIPLES:
-- Progressive overload: increase weight by smallest increment (2.5-5 lbs) when all target reps are hit at RPE < 9
+- Progressive overload: increase weight by the smallest practical increment when all target reps are hit at RPE < 9. Dumbbells increment by 5 lbs (pairs go 25→30→35), barbells/machines/cables increment by 2.5 lbs.
 - If RPE was 9-10 on last session, keep same weight but aim for +1 rep
 - If RPE was 10 and reps declined, suggest same weight and same reps (consolidation)
 - For bodyweight exercises (null weight), progress via reps only
@@ -50,6 +50,7 @@ const exerciseInputSchema = z.object({
   name: z.string(),
   muscle_group: z.string(),
   type: z.string(),
+  equipment: z.string().optional(),
   recentSets: z.array(recentSetSchema),
 })
 
@@ -94,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                   `  ${s.logged_at}: ${s.weight ?? 'BW'} lbs x ${s.reps ?? '?'} reps${s.rpe != null ? ` @ RPE ${s.rpe}` : ''}`,
               )
               .join('\n')
-      return `${e.name} (${e.muscle_group}, ${e.type}):\n${setsText}`
+      return `${e.name} (${e.muscle_group}, ${e.type}, ${e.equipment ?? 'unknown'}):\n${setsText}`
     })
     .join('\n\n')
 

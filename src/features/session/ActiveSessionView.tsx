@@ -190,6 +190,7 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
         displayName,
         bestSet ? { weight: bestSet.weight, reps: bestSet.reps, rpe: bestSet.rpe, logged_at: bestSet.logged_at } : null,
         overrides,
+        e.equipment,
       )
       if (t) m.set(e.id, t)
     }
@@ -291,7 +292,11 @@ export function ActiveSessionView({ onComplete, onCancel }: { onComplete: () => 
       await endSession.mutateAsync({ id: sessionId, foreground_ms: foregroundMs, background_ms: backgroundMs })
       onComplete()
     } catch (e) {
-      setEndError(e instanceof Error ? e.message : 'Failed to save session')
+      const msg =
+        e instanceof Error ? e.message
+        : e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message)
+        : 'Failed to save session'
+      setEndError(msg)
     }
   }
 

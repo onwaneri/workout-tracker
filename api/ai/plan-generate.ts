@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node'
 import Anthropic from '@anthropic-ai/sdk'
 import { generatedPlanSchema } from '../../src/lib/ai/schemas.js'
+import { TRAINING_GUIDELINES } from './training-guidelines.js'
 
 // Simple in-memory rate limiting: max 20 requests per minute per client
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
@@ -32,13 +33,7 @@ function checkRateLimit(clientUuid: string): boolean {
 
 const SYSTEM_PROMPT = `You are a workout plan generator for a gym training app. Generate structured workout plans based on the user's request.
 
-TRAINING SCIENCE GUIDELINES:
-- Volume: 10-20 sets per muscle group per week (MEV ~8-10, MAV ~12-18, MRV ~20-25)
-- Frequency: Each muscle group trained 2-3x per week minimum
-- Exercise selection: 1 compound + 1-2 isolations per muscle group per session
-- Default sets per exercise: 2 (the app uses 2 sets to failure as default)
-- Rep ranges: compounds 6-12, isolations 10-20 (not included in output, just guides exercise choice)
-- Rest between sets: compounds 2-3 min, isolations 1-2 min (not in output)
+${TRAINING_GUIDELINES}
 
 SPLIT TEMPLATES (guide, not rigid):
 - 3 days: Full Body (3 training days, rest days fill the cycle)
@@ -47,14 +42,6 @@ SPLIT TEMPLATES (guide, not rigid):
 - 6 days: PPL (Push/Pull/Legs repeated twice)
 - 7 days: Upper/Lower with rest days (e.g. U/L/Rest/U/L/Rest/Rest)
 
-MUSCLE GROUPS TO COVER:
-Chest, Back/Lats, Front Delts, Side Delts, Rear Delts, Triceps, Biceps, Quads, Hamstrings, Glutes, Calves
-
-EXERCISE SELECTION RULES:
-- Start each training day with compound movements
-- Add isolations after compounds to reach volume targets
-- Muscles needing direct work (not enough from compounds alone): side delts, rear delts, biceps, calves
-- Each training day should have 4-9 exercises
 - Rest days must have is_rest: true and an empty exercises array
 - Total days in the plan should be 3-10 (forming a repeating cycle)
 
@@ -68,6 +55,7 @@ Return a JSON object with:
     - name: exercise name
     - muscle_group: primary muscle targeted
     - type: "compound" or "isolation"
+    - equipment: one of "barbell", "dumbbell", "machine", "cable", "bodyweight" — choose the most common equipment for each exercise
     - default_sets: 2 (always 2 unless user explicitly requests otherwise)
 
 IMPORTANT:

@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { getClientUuid } from '@/lib/supabase/uuid'
-import type { Exercise, ExerciseType, WorkoutDay } from '@/lib/supabase/database.types'
+import type { Exercise, ExerciseType, EquipmentType, WorkoutDay } from '@/lib/supabase/database.types'
 
 export type EditedExercise = {
   id?: string
@@ -8,6 +8,7 @@ export type EditedExercise = {
   name: string
   muscle_group: string
   type: ExerciseType
+  equipment: EquipmentType
   default_sets: number
 }
 
@@ -75,6 +76,7 @@ export async function snapshotPlan(edited: EditedPlan): Promise<string> {
       name: e.name,
       muscle_group: e.muscle_group,
       type: e.type,
+      equipment: e.equipment,
       order_index: idx,
       default_sets: e.default_sets,
       previous_exercise_id: e.prevExerciseId ?? null,
@@ -112,6 +114,7 @@ export function buildEditedPlanFromDb(
             name: e.name,
             muscle_group: e.muscle_group,
             type: e.type,
+            equipment: e.equipment,
             default_sets: e.default_sets,
           })),
         }

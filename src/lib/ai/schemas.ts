@@ -5,6 +5,7 @@ export const exerciseDiffSchema = z.object({
   name: z.string(),
   muscle_group: z.string(),
   type: z.enum(['compound', 'isolation']),
+  equipment: z.enum(['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight']),
   default_sets: z.number().int().min(1).max(10),
 })
 
@@ -60,6 +61,7 @@ export const swapSuggestionSchema = z.object({
   name: z.string(),
   muscle_group: z.string(),
   type: z.enum(['compound', 'isolation']),
+  equipment: z.enum(['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight']),
   rationale: z.string(),
 })
 
@@ -92,6 +94,7 @@ export const generatedExerciseSchema = z.object({
   name: z.string(),
   muscle_group: z.string(),
   type: z.enum(['compound', 'isolation']),
+  equipment: z.enum(['barbell', 'dumbbell', 'machine', 'cable', 'bodyweight']),
   default_sets: z.number().int().min(1).max(10),
 })
 

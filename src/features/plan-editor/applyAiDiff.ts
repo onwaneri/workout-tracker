@@ -1,6 +1,6 @@
 import type { PlanEditAction } from '@/lib/ai/schemas'
 import type { EditedDay, EditedExercise, EditedPlan } from './snapshotPlan'
-import type { Exercise, ExerciseType } from '@/lib/supabase/database.types'
+import type { Exercise, ExerciseType, EquipmentType } from '@/lib/supabase/database.types'
 import { findMatchingExerciseId } from '@/lib/queries/exercises'
 
 /**
@@ -26,6 +26,7 @@ export function applyAiDiff(plan: EditedPlan, actions: PlanEditAction[], allExer
           name: action.exercise.name,
           muscle_group: action.exercise.muscle_group,
           type: action.exercise.type as ExerciseType,
+          equipment: action.exercise.equipment as EquipmentType,
           default_sets: action.exercise.default_sets,
           prevExerciseId: allExercises ? findMatchingExerciseId(action.exercise.name, allExercises) : undefined,
         }
@@ -60,6 +61,7 @@ export function applyAiDiff(plan: EditedPlan, actions: PlanEditAction[], allExer
         if (action.changes.name !== undefined) ex.name = action.changes.name
         if (action.changes.muscle_group !== undefined) ex.muscle_group = action.changes.muscle_group
         if (action.changes.type !== undefined) ex.type = action.changes.type as ExerciseType
+        if (action.changes.equipment !== undefined) ex.equipment = action.changes.equipment as EquipmentType
         if (action.changes.default_sets !== undefined) ex.default_sets = action.changes.default_sets
         break
       }
