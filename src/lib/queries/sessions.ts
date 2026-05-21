@@ -141,8 +141,8 @@ export const useEndSession = () => {
     }): Promise<Session> => {
       const payload = {
         ended_at: new Date().toISOString(),
-        foreground_ms: input.foreground_ms,
-        background_ms: input.background_ms,
+        foreground_ms: Math.round(input.foreground_ms),
+        background_ms: Math.round(input.background_ms),
       }
       const filter = { id: input.id }
       try {
