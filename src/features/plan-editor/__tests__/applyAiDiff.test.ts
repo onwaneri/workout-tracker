@@ -13,9 +13,9 @@ const basePlan: EditedPlan = {
       name: 'Upper A',
       is_rest: false,
       exercises: [
-        { id: 'ex-1', name: 'Incline DB Press', muscle_group: 'Chest', type: 'compound', default_sets: 2 },
-        { id: 'ex-2', name: 'Pull-Ups', muscle_group: 'Lats', type: 'compound', default_sets: 2 },
-        { id: 'ex-3', name: 'Bicep Curl', muscle_group: 'Biceps', type: 'isolation', default_sets: 2 },
+        { id: 'ex-1', name: 'Incline DB Press', muscle_group: 'Chest', type: 'compound', equipment: 'dumbbell', default_sets: 2 },
+        { id: 'ex-2', name: 'Pull-Ups', muscle_group: 'Lats', type: 'compound', equipment: 'bodyweight', default_sets: 2 },
+        { id: 'ex-3', name: 'Bicep Curl', muscle_group: 'Biceps', type: 'isolation', equipment: 'dumbbell', default_sets: 2 },
       ],
     },
     {
@@ -23,8 +23,8 @@ const basePlan: EditedPlan = {
       name: 'Lower A',
       is_rest: false,
       exercises: [
-        { id: 'ex-4', name: 'Leg Press', muscle_group: 'Quads', type: 'compound', default_sets: 2 },
-        { id: 'ex-5', name: 'Calf Raise', muscle_group: 'Calves', type: 'isolation', default_sets: 2 },
+        { id: 'ex-4', name: 'Leg Press', muscle_group: 'Quads', type: 'compound', equipment: 'machine', default_sets: 2 },
+        { id: 'ex-5', name: 'Calf Raise', muscle_group: 'Calves', type: 'isolation', equipment: 'machine', default_sets: 2 },
       ],
     },
     {
@@ -42,7 +42,7 @@ describe('applyAiDiff', () => {
         action: 'add',
         day_index: 0,
         position: 1,
-        exercise: { name: 'Dips', muscle_group: 'Triceps', type: 'compound', default_sets: 3 },
+        exercise: { name: 'Dips', muscle_group: 'Triceps', type: 'compound', equipment: 'bodyweight', default_sets: 3 },
       },
     ]
     const result = applyAiDiff(basePlan, actions)
@@ -94,13 +94,13 @@ describe('applyAiDiff', () => {
         action: 'add',
         day_index: 0,
         position: 0,
-        exercise: { name: 'Barbell Bench', muscle_group: 'Chest', type: 'compound', default_sets: 2 },
+        exercise: { name: 'Barbell Bench', muscle_group: 'Chest', type: 'compound', equipment: 'barbell', default_sets: 2 },
       },
       {
         action: 'add',
         day_index: 0,
         position: 3,
-        exercise: { name: 'Back-Off Set Bench', muscle_group: 'Chest', type: 'compound', default_sets: 1 },
+        exercise: { name: 'Back-Off Set Bench', muscle_group: 'Chest', type: 'compound', equipment: 'barbell', default_sets: 1 },
       },
     ]
     const result = applyAiDiff(basePlan, actions)
@@ -148,7 +148,7 @@ describe('applyAiDiff', () => {
         action: 'add',
         day_index: 1,
         position: 100,
-        exercise: { name: 'New Exercise', muscle_group: 'Test', type: 'isolation', default_sets: 2 },
+        exercise: { name: 'New Exercise', muscle_group: 'Test', type: 'isolation', equipment: 'cable', default_sets: 2 },
       },
     ]
     const result = applyAiDiff(basePlan, actions)
